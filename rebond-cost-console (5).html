@@ -1,0 +1,1754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rebond Cost Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1c1b19; --panel:#242220; --panel2:#2b2925; --panel3:#302d27;
+    --border:#3a372f; --border-lt:#4a4638;
+    --amber:#e8a33d; --amber-dim:#8a6b32;
+    --steel:#5b8aa6; --steel-dim:#3f5f70;
+    --text:#ede8dd; --muted:#9c9686; --muted-dk:#6f6a5c;
+    --good:#7fa65c; --bad:#c1544b;
+    --f-display:'Oswald',sans-serif; --f-body:'IBM Plex Sans',sans-serif; --f-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--f-body);}
+  ::selection{background:var(--amber);color:#1c1b19;}
+  a{color:var(--amber);}
+  @media (prefers-reduced-motion: reduce){ *{transition:none!important; animation:none!important;} }
+
+  #app{max-width:1180px;margin:0 auto;padding:0 20px 60px;}
+
+  header{padding:28px 0 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px;}
+  .brand-eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.18em;color:var(--muted-dk);text-transform:uppercase;margin:0 0 4px;}
+  h1{font-family:var(--f-display);font-weight:600;font-size:30px;letter-spacing:.02em;margin:0;text-transform:uppercase;}
+  .plant-line{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-top:6px;}
+  .dot-live{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);margin-right:6px;box-shadow:0 0 6px var(--good);}
+
+  nav.tabs{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:3px;}
+  nav.tabs button{
+    font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+    background:transparent;border:none;color:var(--muted);padding:9px 16px;border-radius:6px;cursor:pointer;
+    transition:background .15s, color .15s;
+  }
+  nav.tabs button:hover{color:var(--text);}
+  nav.tabs button.active{background:var(--amber);color:#1c1b19;font-weight:600;}
+  nav.tabs button:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+
+  section.view{display:none;padding-top:26px;}
+  section.view.active{display:block;}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px 22px;}
+  .panel + .panel{margin-top:16px;}
+  .panel h2{font-family:var(--f-display);font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 14px;font-weight:500;}
+  .panel h2 .accent{color:var(--text);}
+  .hairline{height:1px;background:var(--border);margin:16px 0;}
+
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px;}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden;}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;}
+  .kpi.k-amber::before{background:var(--amber);}
+  .kpi.k-steel::before{background:var(--steel);}
+  .kpi.k-neutral::before{background:var(--muted-dk);}
+  .kpi-label{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;}
+  .kpi-val{font-family:var(--f-mono);font-size:28px;font-weight:600;color:var(--text);line-height:1;}
+  .kpi-val small{font-size:13px;color:var(--muted);font-weight:400;margin-left:3px;}
+  .kpi-sub{font-family:var(--f-mono);font-size:11px;color:var(--muted-dk);margin-top:6px;}
+
+  .date-picker-row{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+  .date-picker-row label{font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+  select, input[type=date], input[type=number], input[type=text], textarea{
+    background:var(--panel3);border:1px solid var(--border-lt);color:var(--text);
+    font-family:var(--f-mono);font-size:13px;border-radius:6px;padding:8px 10px;
+  }
+  select:focus, input:focus, textarea:focus{outline:2px solid var(--amber);outline-offset:1px;}
+
+  .stack-block{margin-bottom:18px;}
+  .stack-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+  .stack-title{font-family:var(--f-display);font-size:14px;text-transform:uppercase;letter-spacing:.04em;}
+  .stack-title.amber{color:var(--amber);}
+  .stack-title.steel{color:var(--steel);}
+  .stack-total{font-family:var(--f-mono);font-size:13px;color:var(--muted);}
+  .stackbar{display:flex;height:26px;border-radius:4px;overflow:hidden;border:1px solid var(--border);background:var(--panel3);}
+  .stackbar div{height:100%;min-width:0;}
+  .stack-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;}
+  .stack-legend span{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:5px;}
+  .swatch{width:9px;height:9px;border-radius:2px;display:inline-block;}
+
+  .cat-raw{background:#8a6b32;} .cat-labor{background:#c1544b;} .cat-elec{background:#5b8aa6;}
+  .cat-consum{background:#7fa65c;} .cat-other{background:#9c9686;} .cat-oh{background:#e8a33d;}
+
+  canvas{max-width:100%;}
+  .chart-wrap{height:260px;}
+
+  .two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;margin-top:16px;}
+  @media (max-width:900px){ .two-col{grid-template-columns:1fr;} .kpi-row{grid-template-columns:repeat(2,1fr);} }
+
+  .stage{border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden;}
+  .stage-head{padding:12px 18px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;background:var(--panel2);}
+  .stage-head:hover{background:var(--panel3);}
+  .stage-tag{font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;padding:3px 8px;border-radius:4px;text-transform:uppercase;}
+  .tag-shared{background:var(--muted-dk);color:#1c1b19;}
+  .tag-sheets{background:var(--amber);color:#1c1b19;}
+  .tag-underlay{background:var(--steel);color:#1c1b19;}
+  .stage-title{font-family:var(--f-display);font-size:15px;text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;gap:10px;}
+  .chevron{font-family:var(--f-mono);color:var(--muted);transition:transform .15s;}
+  .stage.collapsed .chevron{transform:rotate(-90deg);}
+  .stage-body{padding:16px 18px 18px;background:var(--panel);}
+  .stage.collapsed .stage-body{display:none;}
+
+  .field-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  @media (max-width:760px){ .field-grid{grid-template-columns:repeat(2,1fr);} }
+  .field label{display:block;font-family:var(--f-mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;}
+  .field label .unit{color:var(--muted-dk);text-transform:none;letter-spacing:0;}
+  .field input, .field textarea{width:100%;}
+  .field textarea{resize:vertical;min-height:38px;font-family:var(--f-body);font-size:13px;}
+  .field-span2{grid-column:span 2;}
+
+  .btn{font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--border-lt);
+       background:var(--panel3);color:var(--text);padding:10px 18px;border-radius:6px;cursor:pointer;transition:border-color .15s;}
+  .btn:hover{border-color:var(--amber);}
+  .btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+  .btn-primary{background:var(--amber);color:#1c1b19;border-color:var(--amber);font-weight:600;}
+  .btn-primary:hover{background:#f0af4c;}
+  .btn-danger{border-color:var(--bad);color:var(--bad);}
+  .btn-danger:hover{background:var(--bad);color:#1c1b19;}
+  .btn-sm{padding:6px 12px;font-size:11px;}
+  .btn-row{display:flex;gap:10px;align-items:center;margin-top:18px;flex-wrap:wrap;}
+
+  .preview-strip{display:flex;gap:22px;flex-wrap:wrap;margin-top:6px;padding:14px 18px;background:var(--panel2);border:1px dashed var(--border-lt);border-radius:8px;}
+  .preview-item{font-family:var(--f-mono);font-size:12px;}
+  .preview-item .l{color:var(--muted);display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;}
+  .preview-item .v{font-size:16px;color:var(--text);font-weight:600;}
+  .preview-item .v.amber{color:var(--amber);}
+  .preview-item .v.steel{color:var(--steel);}
+
+  .status-msg{font-family:var(--f-mono);font-size:12px;color:var(--good);min-height:16px;}
+  .status-msg.err{color:var(--bad);}
+
+  table{width:100%;border-collapse:collapse;font-family:var(--f-mono);font-size:12.5px;}
+  th{text-align:left;color:var(--muted);font-weight:500;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid var(--border-lt);}
+  td{padding:9px 10px;border-bottom:1px solid var(--border);}
+  tr:hover td{background:var(--panel2);}
+  .tbl-wrap{overflow-x:auto;}
+  .link-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-family:var(--f-mono);font-size:12px;padding:2px 6px;}
+  .link-btn:hover{color:var(--amber);}
+  .link-btn.del:hover{color:var(--bad);}
+  .empty-state{padding:40px 20px;text-align:center;color:var(--muted);font-family:var(--f-mono);font-size:13px;}
+  .loading-note{font-family:var(--f-mono);font-size:12px;color:var(--muted-dk);padding:20px 0;}
+  .note-box{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);background:var(--panel2);border:1px solid var(--border);
+            border-radius:8px;padding:10px 14px;margin-top:14px;line-height:1.6;}
+
+  /* ---- SKU batch tables ---- */
+  .batch-tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;}
+  table.batch-tbl{font-size:12px;}
+  table.batch-tbl th{white-space:nowrap;background:var(--panel2);}
+  table.batch-tbl td{white-space:nowrap;padding:6px 8px;}
+  table.batch-tbl input{width:88px;padding:6px 7px;font-size:12px;}
+  table.batch-tbl input.spec-input{width:170px;}
+  table.batch-tbl input.count-input{width:56px;}
+  .batch-rm{background:none;border:1px solid var(--border-lt);color:var(--bad);border-radius:5px;cursor:pointer;padding:4px 9px;font-family:var(--f-mono);font-size:11px;}
+  .batch-rm:hover{background:var(--bad);color:#1c1b19;}
+  .batch-add-row{padding:10px 8px;}
+  .batch-empty{padding:16px;text-align:center;color:var(--muted-dk);font-family:var(--f-mono);font-size:12px;}
+
+  .sku-result-tbl td.cost{color:var(--text);font-weight:600;}
+  .sku-result-tbl td.line-amber{border-left:3px solid var(--amber);}
+  .sku-result-tbl td.line-steel{border-left:3px solid var(--steel);}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div>
+      <p class="brand-eyebrow">P N M &middot; Rebonded Foam &amp; Underlay Division</p>
+      <h1>Rebond Cost Console</h1>
+      <p class="plant-line"><span class="dot-live"></span>Daily production cost tracking &mdash; sheets &amp; underlay lines, by SKU</p>
+    </div>
+    <nav class="tabs">
+      <button data-tab="dashboard" class="active">Dashboard</button>
+      <button data-tab="entry">Daily Log</button>
+      <button data-tab="history">History</button>
+      <button data-tab="inventory">Inventory</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
+  </header>
+
+  <!-- ============ DASHBOARD ============ -->
+  <section class="view active" id="view-dashboard">
+    <div class="date-picker-row">
+      <label for="dashDate">Viewing</label>
+      <select id="dashDate"></select>
+      <span id="dashLoading" class="loading-note"></span>
+    </div>
+
+    <div id="dashEmpty" class="empty-state" style="display:none;">
+      No entries logged yet. Go to <strong>Daily Log</strong> to record today's production.
+    </div>
+
+    <div id="dashContent" style="display:none;">
+      <div class="kpi-row">
+        <div class="kpi k-amber">
+          <p class="kpi-label">Sheets &middot; Avg Cost / kg</p>
+          <div class="kpi-val" id="kpiSheetCost">&mdash;</div>
+          <p class="kpi-sub" id="kpiSheetOut">&mdash;</p>
+        </div>
+        <div class="kpi k-steel">
+          <p class="kpi-label">Underlay &middot; Avg Cost / kg</p>
+          <div class="kpi-val" id="kpiUnderlayCost">&mdash;</div>
+          <p class="kpi-sub" id="kpiUnderlayOut">&mdash;</p>
+        </div>
+        <div class="kpi k-neutral">
+          <p class="kpi-label">Blended Cost / kg</p>
+          <div class="kpi-val" id="kpiBlended">&mdash;</div>
+          <p class="kpi-sub" id="kpiTotalOut">&mdash;</p>
+        </div>
+        <div class="kpi k-neutral">
+          <p class="kpi-label">Total Daily Cost</p>
+          <div class="kpi-val" id="kpiTotalCost">&mdash;</div>
+          <p class="kpi-sub" id="kpiWastage">&mdash;</p>
+        </div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi k-amber">
+          <p class="kpi-label">Sheets &middot; Conversion Cost / kg</p>
+          <div class="kpi-val" id="kpiSheetConversion">&mdash;</div>
+          <p class="kpi-sub">Labor + electricity + overhead, excl. raw material</p>
+        </div>
+        <div class="kpi k-steel">
+          <p class="kpi-label">Underlay &middot; Conversion Cost / kg</p>
+          <div class="kpi-val" id="kpiUnderlayConversion">&mdash;</div>
+          <p class="kpi-sub">Labor + electricity + overhead, excl. raw material &amp; lamination</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>SKU-wise cost &mdash; <span class="accent" id="skuDateLabel">selected date</span></h2>
+        <div class="tbl-wrap">
+          <table class="sku-result-tbl">
+            <thead>
+              <tr><th>Line</th><th>Spec</th><th>Output</th><th>Materials cost</th><th>Process cost</th><th>Total cost</th><th>Cost / kg</th><th>Cost / roll</th></tr>
+            </thead>
+            <tbody id="skuResultBody"></tbody>
+          </table>
+        </div>
+        <div class="note-box" id="skuNote"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Cost composition &mdash; <span class="accent">line totals for this day</span></h2>
+        <div class="stack-block">
+          <div class="stack-head">
+            <span class="stack-title amber">Sheets Line</span>
+            <span class="stack-total" id="sheetStackTotal"></span>
+          </div>
+          <div class="stackbar" id="sheetStackBar"></div>
+        </div>
+        <div class="stack-block" style="margin-bottom:0;">
+          <div class="stack-head">
+            <span class="stack-title steel">Underlay Line</span>
+            <span class="stack-total" id="underlayStackTotal"></span>
+          </div>
+          <div class="stackbar" id="underlayStackBar"></div>
+        </div>
+        <div class="stack-legend">
+          <span><i class="swatch cat-raw"></i>Raw Material</span>
+          <span><i class="swatch cat-labor"></i>Labor</span>
+          <span><i class="swatch cat-elec"></i>Electricity</span>
+          <span><i class="swatch cat-consum"></i>Consumables (lamination)</span>
+          <span><i class="swatch cat-other"></i>Other Direct</span>
+          <span><i class="swatch cat-oh"></i>Overhead</span>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="panel">
+          <h2>Cost / kg trend <span class="accent">&mdash; last 30 entries</span></h2>
+          <div class="chart-wrap" id="trendChart"></div>
+        </div>
+        <div class="panel">
+          <h2>Output <span class="accent">&mdash; last 30 entries</span></h2>
+          <div class="chart-wrap" id="outputChart"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DAILY ENTRY ============ -->
+  <section class="view" id="view-entry">
+    <div class="panel">
+      <div class="date-picker-row" style="margin-bottom:0;">
+        <label for="entryDate">Production date</label>
+        <input type="date" id="entryDate">
+        <span class="status-msg" id="entryStatus"></span>
+      </div>
+    </div>
+
+    <div class="stage" id="stage-purchases">
+      <div class="stage-head" onclick="toggleStage('stage-purchases')">
+        <span class="stage-title"><span class="stage-tag tag-shared">Purchases</span>Raw Material Bought Today</span>
+        <span class="chevron">&#9660;</span>
+      </div>
+      <div class="stage-body">
+        <div class="batch-tbl-wrap">
+          <table class="batch-tbl">
+            <thead><tr><th>Material</th><th>Qty (kg)</th><th>Rate ₹/kg <span style="color:var(--muted-dk);">(actual invoice)</span></th><th>Cost</th><th></th></tr></thead>
+            <tbody id="purchaseBody"></tbody>
+          </table>
+        </div>
+        <div class="btn-row" style="margin-top:10px;"><button class="btn btn-sm" onclick="addPurchase()">+ Add purchase</button></div>
+        <div class="note-box">Log what actually came in today at its real invoice rate — leave this empty on days with no delivery. This is what updates the weighted-average cost used to price the raw material consumed below and on future days.</div>
+      </div>
+    </div>
+
+    <div class="stage" id="stage-shared">
+      <div class="stage-head" onclick="toggleStage('stage-shared')">
+        <span class="stage-title"><span class="stage-tag tag-shared">Shared</span>Chipping &amp; Foaming</span>
+        <span class="chevron">&#9660;</span>
+      </div>
+      <div class="stage-body">
+        <div class="field-grid">
+          <div class="field"><label>Foaming stage labor <span class="unit">(₹, total)</span></label><input type="number" id="s_laborCost" min="0" step="any"></div>
+          <div class="field"><label>Foaming stage electricity <span class="unit">(kWh)</span></label><input type="number" id="s_elecUnits" min="0" step="any"></div>
+          <div class="field"><label>Diesel / fuel <span class="unit">(₹)</span></label><input type="number" id="s_dieselCost" min="0" step="any"></div>
+          <div class="field"><label>Repairs &amp; maintenance <span class="unit">(₹)</span></label><input type="number" id="s_maintCost" min="0" step="any"></div>
+        </div>
+        <div class="hairline"></div>
+        <div class="field-grid">
+          <div class="field"><label>Blocks made for Sheets line <span class="unit">(kg)</span></label><input type="number" id="s_sheetBlocksKg" min="0" step="any"></div>
+          <div class="field"><label>Cylindrical blocks for Underlay <span class="unit">(kg)</span></label><input type="number" id="s_underlayBlocksKg" min="0" step="any"></div>
+        </div>
+        <div class="note-box">Raw material is now entered directly under each line below, since the two block types are made on separate machines and you know exact consumption for each. These two weights only set the split ratio for labor, electricity, and overhead — costs that are genuinely shared between the lines.</div>
+      </div>
+    </div>
+
+    <div class="stage" id="stage-sheets">
+      <div class="stage-head" onclick="toggleStage('stage-sheets')">
+        <span class="stage-title"><span class="stage-tag tag-sheets">Sheets</span>Vertical + Circular Cutting</span>
+        <span class="chevron">&#9660;</span>
+      </div>
+      <div class="stage-body">
+        <div class="field-grid">
+          <div class="field"><label>Cutting stage labor <span class="unit">(₹)</span></label><input type="number" id="sh_laborCost" min="0" step="any"></div>
+          <div class="field"><label>Cutting stage electricity <span class="unit">(kWh)</span></label><input type="number" id="sh_elecUnits" min="0" step="any"></div>
+          <div class="field"><label>Trim wastage, all SKUs <span class="unit">(kg)</span></label><input type="number" id="sh_wastageKg" min="0" step="any"></div>
+        </div>
+        <div class="hairline"></div>
+        <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">Raw materials used &mdash; sheet blocks</p>
+        <div class="batch-tbl-wrap">
+          <table class="batch-tbl">
+            <thead><tr><th>Material</th><th>Qty (kg)</th><th>Rate ₹/kg <span style="color:var(--muted-dk);">(ledger)</span></th><th>Cost</th><th></th></tr></thead>
+            <tbody id="sheetRawBody"></tbody>
+          </table>
+        </div>
+        <div class="btn-row" style="margin-top:10px;"><button class="btn btn-sm" onclick="addSheetRaw()">+ Add material</button></div>
+        <div class="note-box">Rate is the current weighted-average cost from the stock ledger, not typed in — it updates automatically as purchases come in. A * means no purchase has been logged for that material yet, so it's using the fallback rate from Settings; a ⚠ means this day draws more than the ledger shows in stock.</div>
+        <div class="hairline"></div>
+        <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">SKUs produced today</p>
+        <div class="batch-tbl-wrap">
+          <table class="batch-tbl">
+            <thead><tr><th>Spec (LxWxHxD)</th><th>Output kg</th><th></th></tr></thead>
+            <tbody id="sheetBatchBody"></tbody>
+          </table>
+        </div>
+        <div class="btn-row" style="margin-top:10px;"><button class="btn btn-sm" onclick="addSheetBatch()">+ Add sheet SKU</button></div>
+      </div>
+    </div>
+
+    <div class="stage" id="stage-underlay">
+      <div class="stage-head" onclick="toggleStage('stage-underlay')">
+        <span class="stage-title"><span class="stage-tag tag-underlay">Underlay</span>Peeling, Lamination &amp; Packing</span>
+        <span class="chevron">&#9660;</span>
+      </div>
+      <div class="stage-body">
+        <div class="field-grid">
+          <div class="field"><label>Peeling labor <span class="unit">(₹)</span></label><input type="number" id="u_peelLaborCost" min="0" step="any"></div>
+          <div class="field"><label>Peeling electricity <span class="unit">(kWh)</span></label><input type="number" id="u_peelElecUnits" min="0" step="any"></div>
+          <div class="field"><label>Lamination + packing labor <span class="unit">(₹)</span></label><input type="number" id="u_lamLaborCost" min="0" step="any"></div>
+          <div class="field"><label>Lamination electricity <span class="unit">(kWh)</span></label><input type="number" id="u_lamElecUnits" min="0" step="any"></div>
+          <div class="field"><label>Wastage, all SKUs <span class="unit">(kg)</span></label><input type="number" id="u_wastageKg" min="0" step="any"></div>
+        </div>
+        <div class="hairline"></div>
+        <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">Raw materials used &mdash; round (cylindrical) blocks</p>
+        <div class="batch-tbl-wrap">
+          <table class="batch-tbl">
+            <thead><tr><th>Material</th><th>Qty (kg)</th><th>Rate ₹/kg <span style="color:var(--muted-dk);">(ledger)</span></th><th>Cost</th><th></th></tr></thead>
+            <tbody id="underlayRawBody"></tbody>
+          </table>
+        </div>
+        <div class="btn-row" style="margin-top:10px;"><button class="btn btn-sm" onclick="addUnderlayRaw()">+ Add material</button></div>
+        <div class="note-box">Rate is the current weighted-average cost from the stock ledger. If sheets and round blocks use the same material on the same day, both draw from one shared stock balance.</div>
+        <div class="hairline"></div>
+        <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">SKUs (rolls) produced today <span style="color:var(--muted-dk);">&mdash; pick a SKU to auto-fill its material cost, or leave as Custom and enter your own</span></p>
+        <div class="batch-tbl-wrap">
+          <table class="batch-tbl">
+            <thead><tr><th>SKU</th><th>Wt/roll (kg)</th><th>Front ₹/roll</th><th>Back ₹/roll</th><th>Bag ₹/roll</th><th>Glue kg</th><th>Rolls</th><th>Output kg <span style="color:var(--muted-dk);">(blank=auto)</span></th><th></th></tr></thead>
+            <tbody id="underlayBatchBody"></tbody>
+          </table>
+        </div>
+        <div class="btn-row" style="margin-top:10px;"><button class="btn btn-sm" onclick="addUnderlayBatch()">+ Add roll SKU</button></div>
+        <div class="note-box">Selecting a SKU pulls its length/width/thickness/density and its front, back, and bag material types from the SKU master (Settings tab) and prices them using current material rates. Front/Back/Bag/Weight fields stay editable afterward if you need to override. Glue is estimated per roll from the default in Settings and can be edited. Output kg auto-calculates as weight/roll × rolls unless you type an actual weighed figure. The shared foaming labor, electricity, and overhead are spread evenly across all roll SKUs by their output weight — raw material above is charged directly, not allocated.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Live preview</h2>
+      <div class="preview-strip" id="livePreview"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveEntry()">Save daily log</button>
+        <button class="btn" onclick="clearEntryForm()">Clear form</button>
+        <button class="btn btn-danger" id="deleteEntryBtn" onclick="deleteCurrentEntry()" style="display:none;">Delete this date's entry</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section class="view" id="view-history">
+    <div class="panel">
+      <h2>All logged days</h2>
+      <div class="tbl-wrap">
+        <table id="historyTable">
+          <thead>
+            <tr>
+              <th>Date</th><th>Sheet SKUs</th><th>Sheets out (kg)</th><th>Sheets avg ₹/kg</th>
+              <th>Roll SKUs</th><th>Underlay out (kg)</th><th>Underlay avg ₹/kg</th><th>Total cost (₹)</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+      <div id="historyEmpty" class="empty-state" style="display:none;">No entries yet.</div>
+    </div>
+  </section>
+
+  <!-- ============ INVENTORY ============ -->
+  <section class="view" id="view-inventory">
+    <div class="panel">
+      <h2>Current stock <span class="accent" id="inventoryAsOf">&mdash;</span></h2>
+      <div class="tbl-wrap">
+        <table id="inventoryStockTable">
+          <thead><tr><th>Material</th><th>Qty on hand (kg)</th><th>Weighted avg cost ₹/kg</th><th>Stock value (₹)</th></tr></thead>
+          <tbody id="inventoryStockBody"></tbody>
+        </table>
+      </div>
+      <div id="inventoryEmpty" class="empty-state" style="display:none;">No purchases or opening stock logged yet.</div>
+      <div class="note-box">Qty shown in red means consumption logged against this material has exceeded what the ledger shows was purchased or on hand — check for a missing purchase entry or an over-logged consumption day.</div>
+    </div>
+    <div class="panel">
+      <h2>Purchase history</h2>
+      <div class="tbl-wrap">
+        <table id="inventoryPurchaseTable">
+          <thead><tr><th>Date</th><th>Material</th><th>Qty (kg)</th><th>Rate ₹/kg</th><th>Cost (₹)</th></tr></thead>
+          <tbody id="inventoryPurchaseBody"></tbody>
+        </table>
+      </div>
+      <div id="inventoryPurchaseEmpty" class="empty-state" style="display:none;">No purchases logged yet.</div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section class="view" id="view-settings">
+    <div class="panel">
+      <h2>Electricity rate</h2>
+      <div class="field-grid">
+        <div class="field"><label>Rate <span class="unit">(₹/unit)</span></label><input type="number" id="set_elecRate" min="0" step="any"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Monthly overheads <span class="accent">&mdash; spread across production days automatically</span></h2>
+      <div class="field-grid">
+        <div class="field"><label>Rent <span class="unit">(₹/month)</span></label><input type="number" id="set_rent" min="0" step="any"></div>
+        <div class="field"><label>Admin salaries <span class="unit">(₹/month)</span></label><input type="number" id="set_admin" min="0" step="any"></div>
+        <div class="field"><label>Depreciation <span class="unit">(₹/month)</span></label><input type="number" id="set_dep" min="0" step="any"></div>
+        <div class="field"><label>Other fixed costs <span class="unit">(₹/month)</span></label><input type="number" id="set_other" min="0" step="any"></div>
+        <div class="field"><label>Production days / month</label><input type="number" id="set_prodDays" min="1" step="1"></div>
+      </div>
+      <div class="note-box">Allocation basis: shared foaming labor, electricity, and daily overhead split between Sheets and Underlay by weight of blocks each line drew from foaming — raw material is charged directly per line, not allocated. Within a line, the allocated share is spread evenly per kg across every SKU produced that day. Say the word if you'd rather allocate by machine-hours per line instead.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Raw materials &amp; opening stock <span class="accent">&mdash; consumption is now costed by the weighted-average ledger, not a typed rate</span></h2>
+      <div class="batch-tbl-wrap">
+        <table class="batch-tbl">
+          <thead><tr><th>Material</th><th>Fallback rate ₹/kg</th><th>Opening stock (kg)</th><th>Opening stock rate ₹/kg</th><th></th></tr></thead>
+          <tbody id="rawMaterialMasterBody"></tbody>
+        </table>
+      </div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn btn-sm" onclick="addRawMaterial()">+ Add material</button>
+        <button class="btn btn-primary" onclick="saveRawMaterialMaster()">Save materials</button>
+      </div>
+      <div class="note-box">Opening stock sets the ledger's starting point — the quantity and average cost of each material already sitting in the yard before you started logging purchases here. Fallback rate is only used if a material is consumed with zero purchase history and no opening stock (so the ledger has nothing to base a weighted average on). Once purchases are logged in the Daily Log, the ledger takes over automatically — see the Inventory tab for current stock and cost.</div>
+      <div class="status-msg" id="rawMaterialStatus"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Roll lamination &amp; packing rates</h2>
+      <div class="field-grid">
+        <div class="field"><label>Nonwoven, plain <span class="unit">(₹/kg)</span></label><input type="number" id="p_nonwovenPlain" min="0" step="any"></div>
+        <div class="field"><label>Nonwoven, printed <span class="unit">(₹/kg)</span></label><input type="number" id="p_nonwovenPrinted" min="0" step="any"></div>
+        <div class="field"><label>Nonwoven width <span class="unit">(m)</span></label><input type="number" id="p_nonwovenWidthM" min="0" step="any"></div>
+        <div class="field"><label>Nonwoven GSM <span class="unit">(g/m²)</span></label><input type="number" id="p_nonwovenGSM" min="0" step="any"></div>
+        <div class="field"><label>Paper, brown <span class="unit">(₹/linear m)</span></label><input type="number" id="p_paperBrown" min="0" step="any"></div>
+        <div class="field"><label>Paper, white <span class="unit">(₹/linear m)</span></label><input type="number" id="p_paperWhite" min="0" step="any"></div>
+        <div class="field"><label>PE film <span class="unit">(₹/linear m)</span></label><input type="number" id="p_peFilm" min="0" step="any"></div>
+        <div class="field"><label>Silver foil <span class="unit">(₹/linear m)</span></label><input type="number" id="p_silverFoil" min="0" step="any"></div>
+        <div class="field"><label>Printed bag <span class="unit">(₹/bag)</span></label><input type="number" id="p_printedBag" min="0" step="any"></div>
+        <div class="field"><label>Clear / color bag <span class="unit">(₹/bag)</span></label><input type="number" id="p_otherBag" min="0" step="any"></div>
+        <div class="field"><label>Lamination glue <span class="unit">(₹/kg)</span></label><input type="number" id="p_glueRate" min="0" step="any"></div>
+        <div class="field"><label>Glue estimate <span class="unit">(kg/roll)</span></label><input type="number" id="p_glueKgPerRoll" min="0" step="any"></div>
+      </div>
+      <div class="btn-row"><button class="btn btn-primary" onclick="savePricing()">Save rates</button></div>
+      <div class="status-msg" id="pricingStatus"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Roll SKU master <span class="accent">&mdash; front/back backing, bag type &amp; dimensions per SKU</span></h2>
+      <div class="batch-tbl-wrap">
+        <table class="batch-tbl">
+          <thead><tr><th>Name</th><th>Front backing</th><th>Back backing</th><th>Outer bag</th><th>Length (m)</th><th>Width (m)</th><th>Thickness (mm)</th><th>Density</th><th>Wt/roll</th><th></th></tr></thead>
+          <tbody id="masterSkuBody"></tbody>
+        </table>
+      </div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn btn-sm" onclick="addMasterSku()">+ Add SKU</button>
+        <button class="btn btn-primary" onclick="saveMasterSkus()">Save SKU master</button>
+      </div>
+      <div class="note-box">Front/back backing text is matched by keyword: "NONWOVEN" (+ "PRINT" for printed rate), "PAPER" (+ "WHITE" for white rate), "PE FILM", or "FOIL". Outer bag is matched by "PRINTED" vs everything else (clear/color bag rate). Weight/roll = Length × Width × Thickness(m) × Density.</div>
+      <div class="status-msg" id="masterSkuStatus"></div>
+    </div>
+
+    <div class="panel" id="storageWarningPanel" style="display:none;border-color:var(--bad);">
+      <h2 style="color:var(--bad);">Database not reachable</h2>
+      <p style="font-family:var(--f-mono);font-size:12px;color:var(--muted);line-height:1.7;">
+        Checking connection...
+      </p>
+    </div>
+
+    <div class="panel">
+      <h2>Data</h2>
+      <p style="font-family:var(--f-mono);font-size:12px;color:var(--muted);">Everyone who opens this page reads and writes the same shared database, so data is live across the team automatically. Export/import gives you a manual backup independent of that.</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+        <button class="btn" onclick="exportAllData()">Export data (.json)</button>
+        <button class="btn" onclick="document.getElementById('importFileInput').click()">Import data (.json)</button>
+        <input type="file" id="importFileInput" accept="application/json" style="display:none;" onchange="importAllData(this.files[0])">
+        <button class="btn btn-danger" onclick="resetAllData()">Reset all data</button>
+      </div>
+      <div class="status-msg" id="settingsStatus"></div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+const DEFAULT_SETTINGS = { elecRate: 8, rent: 150000, admin: 100000, dep: 50000, other: 30000, prodDays: 26 };
+let SETTINGS = {...DEFAULT_SETTINGS};
+let ENTRIES = {}; // dateStr -> entry object
+let batchIdCounter = 1;
+function newBatchId(){ return 'b' + (batchIdCounter++) + '_' + Date.now().toString(36); }
+
+/* ---------------- roll SKU master + pricing ---------------- */
+const DEFAULT_PRICING = {
+  nonwovenPlain:180, nonwovenPrinted:220, nonwovenWidthM:1.45, nonwovenGSM:25,
+  paperBrown:30, paperWhite:35, peFilm:25, silverFoil:20,
+  printedBag:50, otherBag:35, glueRate:250, glueKgPerRoll:1
+};
+let PRICING = {...DEFAULT_PRICING};
+
+const SEED_MASTER_SKUS = [
+  {id:'sku1',  name:'Footprimo 8',    front:'NONWOVEN YELLOW', back:'NONWOVEN IVORY',                    bag:'Printed Bag Primo',        lengthM:11.5, widthM:1.37, thicknessMM:8.0,  density:70},
+  {id:'sku2',  name:'Footlove 8',     front:'NONWOVEN BLUE',   back:'NONWOVEN WHITE SARVA PRINTED',      bag:'Printed Bag Footlove 8',   lengthM:11.5, widthM:1.37, thicknessMM:8.0,  density:70},
+  {id:'sku3',  name:'Footduo 10',     front:'NONWOVEN ORANGE', back:'NONWOVEN IVORY',                    bag:'Printed Bag Duo',          lengthM:11.5, widthM:1.37, thicknessMM:10.0, density:70},
+  {id:'sku4',  name:'Footlove 10',    front:'NONWOVEN ORANGE', back:'NONWOVEN WHITE SARVA PRINTED',      bag:'Printed Bag Footlove 10',  lengthM:11.5, widthM:1.37, thicknessMM:10.0, density:70},
+  {id:'sku26', name:'Footlove 12',    front:'NONWOVEN ORANGE', back:'NONWOVEN WHITE SARVA PRINTED',      bag:'Printed Bag Footlove 12',  lengthM:11.5, widthM:1.37, thicknessMM:12.0, density:70},
+  {id:'sku5',  name:'Bounce 9',       front:'NONWOVEN GREEN',  back:'BROWN COREFRESH PAPER',             bag:'Printed Bag Bounce',       lengthM:11.5, widthM:1.37, thicknessMM:9.0,  density:90},
+  {id:'sku6',  name:'Footbliss 9',    front:'NONWOVEN GREEN',  back:'BROWN PAPER GREEN BLISS PRINT',     bag:'Printed Bag Bliss 9',      lengthM:11.5, widthM:1.37, thicknessMM:9.0,  density:90},
+  {id:'sku8',  name:'Spring 11',      front:'NONWOVEN IVORY',  back:'BROWN COREFRESH PAPER',             bag:'Printed Bag Spring',       lengthM:11.5, widthM:1.37, thicknessMM:11.0, density:90},
+  {id:'sku9',  name:'Footbliss 11',   front:'NONWOVEN IVORY',  back:'BROWN PAPER PURPLE BLISS PRINT',    bag:'Printed Bag Bliss 11',     lengthM:11.5, widthM:1.37, thicknessMM:11.0, density:90},
+  {id:'sku10', name:'Bloom 9',        front:'NONWOVEN YELLOW', back:'BROWN COREFRESH PAPER',             bag:'Printed Bag Bloom',        lengthM:11.5, widthM:1.37, thicknessMM:9.0,  density:120},
+  {id:'sku11', name:'Footluxe 9',     front:'NONWOVEN YELLOW', back:'WHITE PAPER GREEN LUXE PRINT',      bag:'Printed Bag Luxe 9',       lengthM:11.5, widthM:1.37, thicknessMM:9.0,  density:120},
+  {id:'sku12', name:'Pulse 11',       front:'NONWOVEN IVORY',  back:'WHITE COREFRESH PAPER',             bag:'Printed Bag Pulse',        lengthM:11.5, widthM:1.37, thicknessMM:10.0, density:120},
+  {id:'sku13', name:'Footluxe 11',    front:'NONWOVEN IVORY',  back:'WHITE PAPER PURPLE LUXE PRINT',     bag:'Printed Bag Luxe 11',      lengthM:11.5, widthM:1.37, thicknessMM:11.0, density:120},
+  {id:'sku14', name:'Royale 10',      front:'NONWOVEN DARK PINK', back:'WHITE COREFRESH PAPER',          bag:'Printed Bag Royale',       lengthM:11.5, widthM:1.37, thicknessMM:10.0, density:160},
+  {id:'sku15', name:'Footopus 10',    front:'NONWOVEN DARK PINK', back:'WHITE PAPER SARVA PRINTED',      bag:'Printed Bag Opus',         lengthM:11.5, widthM:1.37, thicknessMM:10.0, density:160},
+  {id:'sku16', name:'Base Silver',    front:'NONWOVEN YELLOW', back:'SILVER FOIL',                       bag:'Clear Bag',                lengthM:8.0,  widthM:1.37, thicknessMM:3.5,  density:180},
+  {id:'sku17', name:'Footboard 3.5',  front:'NONWOVEN YELLOW', back:'SILVER FOIL',                       bag:'Printed Bag Footboard',    lengthM:8.0,  widthM:1.37, thicknessMM:3.5,  density:180},
+  {id:'sku18', name:'Footwork 5.5',   front:'PE FILM',         back:'PE FILM',                           bag:'Clear Bag',                lengthM:11.5, widthM:1.37, thicknessMM:5.5,  density:160},
+  {id:'sku19', name:'Footwork 6.5',   front:'PE FILM',         back:'PE FILM',                           bag:'Clear Bag',                lengthM:11.5, widthM:1.37, thicknessMM:6.5,  density:160},
+  {id:'sku20', name:'Footsolo 8',     front:'NONWOVEN GREEN',  back:'NONWOVEN IVORY',                    bag:'Clear Bag',                lengthM:11.5, widthM:1.37, thicknessMM:8.0,  density:90},
+  {id:'sku21', name:'Footmate 8',     front:'NONWOVEN GREEN',  back:'NONWOVEN IVORY',                    bag:'Clear Bag',                lengthM:11.5, widthM:1.37, thicknessMM:8.0,  density:90},
+  {id:'sku22', name:'Footspirit 10',  front:'NONWOVEN BLUE',   back:'NONWOVEN IVORY',                    bag:'Clear Bag',                lengthM:11.5, widthM:1.37, thicknessMM:10.0, density:90},
+  {id:'sku23', name:'Footmate 10',    front:'NONWOVEN BLUE',   back:'NONWOVEN IVORY',                    bag:'Clear Bag',                lengthM:11.5, widthM:1.37, thicknessMM:10.0, density:90},
+  {id:'sku24', name:'FootUB55D 8',    front:'NONWOVEN YELLOW', back:'NONWOVEN IVORY',                    bag:'Yellow Bag',               lengthM:11.5, widthM:1.37, thicknessMM:8.0,  density:70},
+  {id:'sku25', name:'FootUB55D 10',   front:'NONWOVEN ORANGE', back:'NONWOVEN IVORY',                    bag:'Orange Bag',               lengthM:11.5, widthM:1.37, thicknessMM:10.0, density:70}
+];
+let MASTER_SKUS = SEED_MASTER_SKUS.map(s=>({...s}));
+
+const SEED_RAW_MATERIALS = [
+  {id:'rm1', name:'Local Foam Scrap', rate:40, openingQty:0, openingRate:null},
+  {id:'rm2', name:'Imported Foam Scrap', rate:35, openingQty:0, openingRate:null},
+  {id:'rm3', name:'Rebonded Foam Chips', rate:30, openingQty:0, openingRate:null},
+  {id:'rm4', name:'Binder / Adhesive (PU)', rate:200, openingQty:0, openingRate:null}
+];
+let RAW_MATERIAL_MASTER = SEED_RAW_MATERIALS.map(m=>({...m}));
+
+function skuWeightPerRoll(sku){
+  return (Number(sku.lengthM)||0) * (Number(sku.widthM)||0) * ((Number(sku.thicknessMM)||0)/1000) * (Number(sku.density)||0);
+}
+function classifyMaterial(text){
+  const t = (text||'').toUpperCase();
+  if(t.includes('NONWOVEN')) return {type:'nonwoven', printed:t.includes('PRINT'), white:false};
+  if(t.includes('PAPER')) return {type:'paper', printed:false, white:t.includes('WHITE')};
+  if(t.includes('PE FILM') || t.includes('PEFILM')) return {type:'pefilm', printed:false, white:false};
+  if(t.includes('FOIL')) return {type:'foil', printed:false, white:false};
+  return {type:'other', printed:false, white:false};
+}
+function materialCostPerRoll(text, lengthM, pricing){
+  const info = classifyMaterial(text);
+  if(info.type==='nonwoven'){
+    const kg = lengthM * pricing.nonwovenWidthM * pricing.nonwovenGSM/1000;
+    const rate = info.printed ? pricing.nonwovenPrinted : pricing.nonwovenPlain;
+    return kg*rate;
+  }
+  if(info.type==='paper'){
+    const rate = info.white ? pricing.paperWhite : pricing.paperBrown;
+    return lengthM*rate;
+  }
+  if(info.type==='pefilm') return lengthM*pricing.peFilm;
+  if(info.type==='foil') return lengthM*pricing.silverFoil;
+  return 0;
+}
+function bagCostFn(text, pricing){
+  const t = (text||'').toUpperCase();
+  return t.includes('PRINTED') ? pricing.printedBag : pricing.otherBag;
+}
+function computeSkuCosts(sku, pricing){
+  return {
+    weightPerRoll: skuWeightPerRoll(sku),
+    frontCostPerRoll: materialCostPerRoll(sku.front, sku.lengthM, pricing),
+    backCostPerRoll: materialCostPerRoll(sku.back, sku.lengthM, pricing),
+    bagCostPerRoll: bagCostFn(sku.bag, pricing)
+  };
+}
+
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtMoney(n){ if(!isFinite(n)) n=0; return '₹' + Math.round(n).toLocaleString('en-IN'); }
+function fmtKg(n){ if(!isFinite(n)) n=0; return n.toLocaleString('en-IN', {maximumFractionDigits:1}) + ' kg'; }
+function num(id){ const el = document.getElementById(id); if(!el) return 0; const v = parseFloat(el.value); return isFinite(v) ? v : 0; }
+
+/* ---------------- storage layer — Supabase (Postgres), open-link access ---------------- */
+const SUPABASE_URL = 'https://oxedrqiajvtfoyshopyi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94ZWRycWlhanZ0Zm95c2hvcHlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4Njk2NDgsImV4cCI6MjEwMjQ0NTY0OH0.Wdw-fSYTP7MvwfoBMWwZiol0s8kAH6gjr7tALhwozgA';
+const SUPABASE_REST = SUPABASE_URL + '/rest/v1/app_kv';
+const SUPABASE_HEADERS = {
+  'apikey': SUPABASE_ANON_KEY,
+  'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+  'Content-Type': 'application/json'
+};
+
+let STORAGE_OK = true;
+let LAST_STORAGE_ERROR = '';
+
+async function storageGet(key){
+  try{
+    const resp = await fetch(`${SUPABASE_REST}?key=eq.${encodeURIComponent(key)}&select=value`, { headers: SUPABASE_HEADERS });
+    if(!resp.ok){ LAST_STORAGE_ERROR = `Supabase GET ${resp.status}: ${await resp.text()}`; return null; }
+    const rows = await resp.json();
+    return rows.length ? rows[0].value : null;
+  }catch(e){ LAST_STORAGE_ERROR = e && e.message ? e.message : String(e); return null; }
+}
+async function storageSet(key, valueObj){
+  try{
+    const resp = await fetch(`${SUPABASE_REST}?on_conflict=key`, {
+      method: 'POST',
+      headers: {...SUPABASE_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal'},
+      body: JSON.stringify({ key, value: JSON.stringify(valueObj), updated_at: new Date().toISOString() })
+    });
+    if(!resp.ok){ LAST_STORAGE_ERROR = `Supabase POST ${resp.status}: ${await resp.text()}`; return false; }
+    return true;
+  }catch(e){ LAST_STORAGE_ERROR = e && e.message ? e.message : String(e); console.error('storage set failed', e); return false; }
+}
+async function storageDelete(key){
+  try{
+    const resp = await fetch(`${SUPABASE_REST}?key=eq.${encodeURIComponent(key)}`, { method:'DELETE', headers: SUPABASE_HEADERS });
+    if(!resp.ok){ LAST_STORAGE_ERROR = `Supabase DELETE ${resp.status}: ${await resp.text()}`; return false; }
+    return true;
+  }catch(e){ LAST_STORAGE_ERROR = e && e.message ? e.message : String(e); console.error('storage delete failed', e); return false; }
+}
+async function storageList(prefix){
+  try{
+    const resp = await fetch(`${SUPABASE_REST}?key=like.${encodeURIComponent(prefix)}*&select=key`, { headers: SUPABASE_HEADERS });
+    if(!resp.ok){ LAST_STORAGE_ERROR = `Supabase LIST ${resp.status}: ${await resp.text()}`; return []; }
+    const rows = await resp.json();
+    return rows.map(r=>r.key);
+  }catch(e){ LAST_STORAGE_ERROR = e && e.message ? e.message : String(e); return []; }
+}
+async function checkStorageAvailable(){
+  const probeKey = '__storage_probe__';
+  const ok = await storageSet(probeKey, {t: Date.now()});
+  if(ok){ await storageDelete(probeKey); }
+  STORAGE_OK = ok;
+  return ok;
+}
+function showStorageWarningIfNeeded(){
+  const panel = document.getElementById('storageWarningPanel');
+  if(!panel) return;
+  if(!STORAGE_OK){
+    panel.style.display = 'block';
+    panel.querySelector('p').innerHTML =
+      `Could not reach the shared database. Check your internet connection, and that the Supabase project is active (free-tier projects pause after a week of no traffic — open the Supabase dashboard to wake it up).<br><br>` +
+      `Detail: <span style="color:var(--bad);">${LAST_STORAGE_ERROR||'unknown error'}</span><br><br>` +
+      `Use <strong>Export data</strong> below before closing, and <strong>Import data</strong> once it's reachable again — this keeps your logs safe either way.`;
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+/* ---------------- manual JSON backup (works with or without storage) ---------------- */
+function exportAllData(){
+  const payload = { exportedAt: new Date().toISOString(), settings: SETTINGS, pricing: PRICING, masterSkus: MASTER_SKUS, rawMaterialMaster: RAW_MATERIAL_MASTER, entries: ENTRIES };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'rebond-cost-console-backup-' + todayStr() + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  const el = document.getElementById('settingsStatus');
+  el.textContent = 'Backup file downloaded.';
+  el.className = 'status-msg';
+}
+async function importAllData(file){
+  if(!file) return;
+  const el = document.getElementById('settingsStatus');
+  try{
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    if(payload.settings) SETTINGS = {...DEFAULT_SETTINGS, ...payload.settings};
+    if(payload.pricing) PRICING = {...DEFAULT_PRICING, ...payload.pricing};
+    if(payload.masterSkus && Array.isArray(payload.masterSkus)) MASTER_SKUS = payload.masterSkus;
+    if(payload.rawMaterialMaster && Array.isArray(payload.rawMaterialMaster)) RAW_MATERIAL_MASTER = payload.rawMaterialMaster;
+    if(payload.entries) ENTRIES = payload.entries;
+
+    // try to push into storage too, in case it's available now
+    if(STORAGE_OK){
+      await storageSet('settings', SETTINGS);
+      await storageSet('roll_pricing', PRICING);
+      await storageSet('roll_master_skus', MASTER_SKUS);
+      await storageSet('raw_material_master', RAW_MATERIAL_MASTER);
+      await Promise.all(Object.values(ENTRIES).map(e => storageSet('daily:'+e.date, e)));
+    }
+
+    fillSettingsForm(); fillPricingForm(); renderMasterSkuTable(); renderRawMaterialMasterTable();
+    populateDashDateSelect(); renderDashboard(); renderHistory();
+    el.textContent = 'Backup loaded (' + Object.keys(ENTRIES).length + ' daily logs).' + (STORAGE_OK ? '' : ' Storage is unavailable here, so re-export before you close this window.');
+    el.className = 'status-msg';
+  }catch(e){
+    el.textContent = 'Could not read that file — is it a backup exported from this console?';
+    el.className = 'status-msg err';
+  }
+}
+
+async function loadSettings(){
+  const raw = await storageGet('settings');
+  if(raw){ try{ SETTINGS = {...DEFAULT_SETTINGS, ...JSON.parse(raw)}; }catch(e){} }
+}
+async function loadPricing(){
+  const raw = await storageGet('roll_pricing');
+  if(raw){ try{ PRICING = {...DEFAULT_PRICING, ...JSON.parse(raw)}; }catch(e){} }
+}
+async function loadMasterSkus(){
+  const raw = await storageGet('roll_master_skus');
+  if(raw){ try{ const parsed = JSON.parse(raw); if(Array.isArray(parsed) && parsed.length) MASTER_SKUS = parsed; }catch(e){} }
+}
+async function loadRawMaterialMaster(){
+  const raw = await storageGet('raw_material_master');
+  if(raw){ try{ const parsed = JSON.parse(raw); if(Array.isArray(parsed) && parsed.length) RAW_MATERIAL_MASTER = parsed; }catch(e){} }
+}
+async function loadAllEntries(){
+  const keys = await storageList('daily:');
+  const results = await Promise.all(keys.map(k => storageGet(k)));
+  ENTRIES = {};
+  keys.forEach((k, i) => {
+    if(results[i]){
+      try{ const obj = JSON.parse(results[i]); ENTRIES[obj.date] = obj; }catch(e){}
+    }
+  });
+}
+
+/* ---------------- computation ---------------- */
+/* ---------------- weighted-average raw material inventory ledger ---------------- */
+function computeInventoryLedger(entriesMap, materialMaster){
+  const dates = Object.keys(entriesMap).sort();
+  const state = {}; // materialId -> {qty, avgCost}
+  materialMaster.forEach(m=>{
+    const openQty = Number(m.openingQty)||0;
+    const openRate = (m.openingRate!=null && m.openingRate!=='') ? Number(m.openingRate) : Number(m.rate)||0;
+    state[m.id] = { qty: openQty, avgCost: openRate };
+  });
+  const ledgerByDate = {};
+  dates.forEach(date=>{
+    const e = entriesMap[date] || {};
+    const perMaterial = {};
+    // 1) purchases update the running weighted average first
+    (e.purchases||[]).forEach(p=>{
+      if(!p.materialId) return;
+      const qty = Number(p.qtyKg)||0;
+      const pRate = Number(p.rate)||0;
+      if(qty<=0) return;
+      const cur = state[p.materialId] || {qty:0, avgCost:pRate};
+      const newQty = cur.qty + qty;
+      const newAvg = newQty>0 ? ((cur.qty*cur.avgCost)+(qty*pRate))/newQty : pRate;
+      state[p.materialId] = { qty:newQty, avgCost:newAvg };
+    });
+    // 2) consumption (both lines draw from the same physical stock) is charged at today's avg cost
+    const consumedByMaterial = {};
+    (e.sh_rawMaterials||[]).forEach(m=>{ if(m.materialId) consumedByMaterial[m.materialId] = (consumedByMaterial[m.materialId]||0) + (Number(m.qtyKg)||0); });
+    (e.u_rawMaterials||[]).forEach(m=>{ if(m.materialId) consumedByMaterial[m.materialId] = (consumedByMaterial[m.materialId]||0) + (Number(m.qtyKg)||0); });
+    Object.keys(consumedByMaterial).forEach(materialId=>{
+      const consumedQty = consumedByMaterial[materialId];
+      const fallback = (materialMaster.find(m=>m.id===materialId)||{}).rate || 0;
+      const cur = state[materialId] || {qty:0, avgCost:fallback};
+      const avgCostToCharge = cur.avgCost;
+      const warning = cur.qty < consumedQty - 0.001;
+      state[materialId] = { qty: cur.qty - consumedQty, avgCost: cur.avgCost };
+      perMaterial[materialId] = { avgCostToCharge, consumedQty, warning, qtyOnHandAfter: state[materialId].qty };
+    });
+    ledgerByDate[date] = { perMaterial };
+  });
+  return { ledgerByDate, finalState: state, lastDate: dates.length ? dates[dates.length-1] : null };
+}
+
+function computeDay(e, settings, materialRates){
+  materialRates = materialRates || {};
+  const rate = settings.elecRate;
+  const sharedLabor = e.s_laborCost;
+  const sharedElec = e.s_elecUnits*rate;
+  const sharedOther = e.s_dieselCost + e.s_maintCost;
+
+  const totalBlocks = e.s_sheetBlocksKg + e.s_underlayBlocksKg;
+  const sheetRatio = totalBlocks>0 ? e.s_sheetBlocksKg/totalBlocks : 0;
+  const underlayRatio = totalBlocks>0 ? e.s_underlayBlocksKg/totalBlocks : 0;
+
+  const dailyOverhead = (settings.rent+settings.admin+settings.dep+settings.other) / Math.max(settings.prodDays,1);
+
+  const sheetRawMaterials = (e.sh_rawMaterials||[]).map(m=>{
+    const resolved = materialRates[m.materialId];
+    const fallback = (RAW_MATERIAL_MASTER.find(x=>x.id===m.materialId)||{}).rate || 0;
+    return {...m, qtyKg:Number(m.qtyKg)||0, rate: resolved ? resolved.avgCostToCharge : fallback, ledgerWarning: resolved ? resolved.warning : false, noLedger: !resolved};
+  });
+  const sheetRawCost = sheetRawMaterials.reduce((s,m)=>s+m.qtyKg*m.rate,0);
+
+  const sheetBatches = (e.sh_batches||[]).map(b=>({...b, outputKg: Number(b.outputKg)||0}));
+  const totalSheetOut = sheetBatches.reduce((s,b)=>s+b.outputKg,0);
+
+  const sheetsPool = {
+    raw: sheetRawCost,
+    labor: sharedLabor*sheetRatio + e.sh_laborCost,
+    elec: sharedElec*sheetRatio + e.sh_elecUnits*rate,
+    other: sharedOther*sheetRatio,
+    oh: dailyOverhead*sheetRatio
+  };
+  const sheetsPoolTotal = sheetsPool.raw+sheetsPool.labor+sheetsPool.elec+sheetsPool.other+sheetsPool.oh;
+  const sheetsRatePerKg = totalSheetOut>0 ? sheetsPoolTotal/totalSheetOut : 0;
+
+  sheetBatches.forEach(b=>{
+    b.processCost = sheetsRatePerKg * b.outputKg;
+    b.materialsCost = 0;
+    b.totalCost = b.processCost;
+    b.costPerKg = b.outputKg>0 ? b.totalCost/b.outputKg : 0;
+    b.costPerRoll = null;
+  });
+
+  const sheets = {
+    raw: sheetsPool.raw, labor: sheetsPool.labor, elec: sheetsPool.elec, consum:0,
+    other: sheetsPool.other, oh: sheetsPool.oh,
+    outputKg: totalSheetOut, wastageKg: e.sh_wastageKg, batches: sheetBatches, ratePerKg: sheetsRatePerKg,
+    rawMaterials: sheetRawMaterials
+  };
+  sheets.total = sheetsPoolTotal;
+  sheets.perKg = totalSheetOut>0 ? sheets.total/totalSheetOut : 0;
+  sheets.conversionCost = sheets.labor+sheets.elec+sheets.other+sheets.oh; // total minus raw material — the value added by processing
+  sheets.conversionPerKg = totalSheetOut>0 ? sheets.conversionCost/totalSheetOut : 0;
+
+  const underlayRawMaterials = (e.u_rawMaterials||[]).map(m=>{
+    const resolved = materialRates[m.materialId];
+    const fallback = (RAW_MATERIAL_MASTER.find(x=>x.id===m.materialId)||{}).rate || 0;
+    return {...m, qtyKg:Number(m.qtyKg)||0, rate: resolved ? resolved.avgCostToCharge : fallback, ledgerWarning: resolved ? resolved.warning : false, noLedger: !resolved};
+  });
+  const underlayRawCost = underlayRawMaterials.reduce((s,m)=>s+m.qtyKg*m.rate,0);
+
+  const underlayBatches = (e.u_batches||[]).map(b=>({...b,
+    rollCount: Number(b.rollCount)||0, glueKg: Number(b.glueKg)||0,
+    weightPerRoll: Number(b.weightPerRoll)||0,
+    frontCostPerRoll: Number(b.frontCostPerRoll)||0, backCostPerRoll: Number(b.backCostPerRoll)||0,
+    bagCostPerRoll: Number(b.bagCostPerRoll)||0,
+    outputKgOverride: (b.outputKgOverride!=null && b.outputKgOverride!=='') ? Number(b.outputKgOverride) : null
+  }));
+  underlayBatches.forEach(b=>{
+    b.outputKg = (b.outputKgOverride && b.outputKgOverride>0) ? b.outputKgOverride : b.weightPerRoll*b.rollCount;
+  });
+  const totalUnderlayOut = underlayBatches.reduce((s,b)=>s+b.outputKg,0);
+  const totalRolls = underlayBatches.reduce((s,b)=>s+b.rollCount,0);
+
+  const underlayPool = {
+    raw: underlayRawCost,
+    labor: sharedLabor*underlayRatio + e.u_peelLaborCost + e.u_lamLaborCost,
+    elec: sharedElec*underlayRatio + e.u_peelElecUnits*rate + e.u_lamElecUnits*rate,
+    other: sharedOther*underlayRatio,
+    oh: dailyOverhead*underlayRatio
+  };
+  const underlayPoolTotal = underlayPool.raw+underlayPool.labor+underlayPool.elec+underlayPool.other+underlayPool.oh;
+  const underlayRatePerKg = totalUnderlayOut>0 ? underlayPoolTotal/totalUnderlayOut : 0;
+
+  let consumTotal = 0;
+  underlayBatches.forEach(b=>{
+    b.materialsCost = (b.frontCostPerRoll+b.backCostPerRoll+b.bagCostPerRoll)*b.rollCount + b.glueKg*(PRICING.glueRate||0);
+    b.processCost = underlayRatePerKg * b.outputKg;
+    b.totalCost = b.materialsCost + b.processCost;
+    b.costPerKg = b.outputKg>0 ? b.totalCost/b.outputKg : 0;
+    b.costPerRoll = b.rollCount>0 ? b.totalCost/b.rollCount : null;
+    consumTotal += b.materialsCost;
+  });
+
+  const underlay = {
+    raw: underlayPool.raw, labor: underlayPool.labor, elec: underlayPool.elec, consum: consumTotal,
+    other: underlayPool.other, oh: underlayPool.oh,
+    outputKg: totalUnderlayOut, wastageKg: e.u_wastageKg, rollCount: totalRolls,
+    batches: underlayBatches, ratePerKg: underlayRatePerKg, rawMaterials: underlayRawMaterials
+  };
+  underlay.total = underlayPoolTotal + consumTotal;
+  underlay.perKg = totalUnderlayOut>0 ? underlay.total/totalUnderlayOut : 0;
+  underlay.perRoll = totalRolls>0 ? underlay.total/totalRolls : 0;
+  underlay.conversionCost = underlay.labor+underlay.elec+underlay.other+underlay.oh; // total minus raw material and lamination consumables
+  underlay.conversionPerKg = totalUnderlayOut>0 ? underlay.conversionCost/totalUnderlayOut : 0;
+
+  const totalCost = sheets.total+underlay.total;
+  const totalOut = sheets.outputKg+underlay.outputKg;
+  const blended = totalOut>0 ? totalCost/totalOut : 0;
+
+  return { sheets, underlay, totalCost, totalOut, blended, dailyOverhead };
+}
+
+function blankEntry(date){
+  return {
+    date,
+    purchases:[],
+    s_laborCost:0,s_elecUnits:0,s_dieselCost:0,s_maintCost:0,
+    s_sheetBlocksKg:0,s_underlayBlocksKg:0,
+    sh_laborCost:0,sh_elecUnits:0,sh_wastageKg:0,
+    sh_rawMaterials:[],
+    sh_batches:[],
+    u_peelLaborCost:0,u_peelElecUnits:0,u_lamLaborCost:0,u_lamElecUnits:0,u_wastageKg:0,
+    u_rawMaterials:[],
+    u_batches:[]
+  };
+}
+
+/* ---------------- tabs ---------------- */
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('section.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-'+btn.dataset.tab).classList.add('active');
+    if(btn.dataset.tab==='history') renderHistory();
+    if(btn.dataset.tab==='inventory') renderInventory();
+    if(btn.dataset.tab==='dashboard') renderDashboard();
+  });
+});
+function toggleStage(id){ document.getElementById(id).classList.toggle('collapsed'); }
+
+/* ---------------- raw material rows (entry form) ---------------- */
+let CURRENT_SHEET_RAWMATS = [];
+let CURRENT_UNDERLAY_RAWMATS = [];
+
+function rawMaterialOptions(selectedId){
+  const opts = ['<option value="">— select —</option>'];
+  RAW_MATERIAL_MASTER.forEach(m=>{
+    opts.push(`<option value="${m.id}" ${m.id===selectedId?'selected':''}>${m.name}</option>`);
+  });
+  return opts.join('');
+}
+function renderRawRows(list, bodyId, updateFn, removeFn, selectFn){
+  const body = document.getElementById(bodyId);
+  if(list.length===0){
+    body.innerHTML = `<tr><td colspan="5" class="batch-empty">No materials added yet.</td></tr>`;
+    return;
+  }
+  const { materialRates } = currentEditingLedgerRates();
+  body.innerHTML = list.map(m=>{
+    const resolved = materialRates[m.materialId];
+    const fallback = (RAW_MATERIAL_MASTER.find(x=>x.id===m.materialId)||{}).rate || 0;
+    const rateUsed = resolved ? resolved.avgCostToCharge : fallback;
+    const cost = (Number(m.qtyKg)||0) * rateUsed;
+    const warn = resolved && resolved.warning;
+    const noLedger = m.materialId && !resolved;
+    const rateTitle = !m.materialId ? '' : (noLedger ? 'No purchases logged for this material yet — using the fallback rate from Settings.' : 'Weighted-average cost from the stock ledger.') + (warn ? ' Warning: consumption on this day exceeds recorded stock.' : '');
+    return `<tr>
+      <td><select onchange="${selectFn}('${m.id}', this.value)">${rawMaterialOptions(m.materialId)}</select></td>
+      <td><input type="number" min="0" step="any" value="${m.qtyKg||''}" onchange="${updateFn}('${m.id}',this.value)" oninput="updateLivePreview()"></td>
+      <td style="font-family:var(--f-mono);color:${warn?'var(--bad)':'var(--muted)'};" title="${rateTitle}">${m.materialId ? fmtMoney(rateUsed) + (noLedger?' *':'') + (warn?' ⚠':'') : '—'}</td>
+      <td style="font-family:var(--f-mono);color:var(--muted);">${fmtMoney(cost)}</td>
+      <td><button class="batch-rm" onclick="${removeFn}('${m.id}')">Remove</button></td>
+    </tr>`;
+  }).join('');
+}
+function renderSheetRawRows(){ renderRawRows(CURRENT_SHEET_RAWMATS, 'sheetRawBody', 'updateSheetRaw', 'removeSheetRaw', 'selectSheetRaw'); }
+function renderUnderlayRawRows(){ renderRawRows(CURRENT_UNDERLAY_RAWMATS, 'underlayRawBody', 'updateUnderlayRaw', 'removeUnderlayRaw', 'selectUnderlayRaw'); }
+function refreshRawMaterialDisplays(){ renderSheetRawRows(); renderUnderlayRawRows(); }
+
+function addSheetRaw(){ CURRENT_SHEET_RAWMATS.push({id:newBatchId(), materialId:'', materialName:'', qtyKg:0}); renderSheetRawRows(); updateLivePreview(); }
+function removeSheetRaw(id){ CURRENT_SHEET_RAWMATS = CURRENT_SHEET_RAWMATS.filter(m=>m.id!==id); refreshRawMaterialDisplays(); updateLivePreview(); }
+function updateSheetRaw(id, value){
+  const m = CURRENT_SHEET_RAWMATS.find(x=>x.id===id);
+  if(m){ m.qtyKg = parseFloat(value)||0; }
+  refreshRawMaterialDisplays(); updateLivePreview();
+}
+function selectSheetRaw(id, materialId){
+  const m = CURRENT_SHEET_RAWMATS.find(x=>x.id===id);
+  if(!m) return;
+  m.materialId = materialId;
+  const mat = RAW_MATERIAL_MASTER.find(x=>x.id===materialId);
+  if(mat){ m.materialName = mat.name; }
+  refreshRawMaterialDisplays(); updateLivePreview();
+}
+
+function addUnderlayRaw(){ CURRENT_UNDERLAY_RAWMATS.push({id:newBatchId(), materialId:'', materialName:'', qtyKg:0}); renderUnderlayRawRows(); updateLivePreview(); }
+function removeUnderlayRaw(id){ CURRENT_UNDERLAY_RAWMATS = CURRENT_UNDERLAY_RAWMATS.filter(m=>m.id!==id); refreshRawMaterialDisplays(); updateLivePreview(); }
+function updateUnderlayRaw(id, value){
+  const m = CURRENT_UNDERLAY_RAWMATS.find(x=>x.id===id);
+  if(m){ m.qtyKg = parseFloat(value)||0; }
+  refreshRawMaterialDisplays(); updateLivePreview();
+}
+function selectUnderlayRaw(id, materialId){
+  const m = CURRENT_UNDERLAY_RAWMATS.find(x=>x.id===id);
+  if(!m) return;
+  m.materialId = materialId;
+  const mat = RAW_MATERIAL_MASTER.find(x=>x.id===materialId);
+  if(mat){ m.materialName = mat.name; }
+  refreshRawMaterialDisplays(); updateLivePreview();
+}
+
+/* ---------------- purchase rows (entry form) — these feed the weighted-average ledger ---------------- */
+let CURRENT_PURCHASES = [];
+function renderPurchaseRows(){
+  const body = document.getElementById('purchaseBody');
+  if(CURRENT_PURCHASES.length===0){
+    body.innerHTML = `<tr><td colspan="5" class="batch-empty">No purchases logged for this date.</td></tr>`;
+    return;
+  }
+  body.innerHTML = CURRENT_PURCHASES.map(p=>{
+    const cost = (Number(p.qtyKg)||0) * (Number(p.rate)||0);
+    return `<tr>
+      <td><select onchange="selectPurchaseMaterial('${p.id}', this.value)">${rawMaterialOptions(p.materialId)}</select></td>
+      <td><input type="number" min="0" step="any" value="${p.qtyKg||''}" onchange="updatePurchase('${p.id}','qtyKg',this.value)" oninput="updateLivePreview()"></td>
+      <td><input type="number" min="0" step="any" value="${p.rate||''}" onchange="updatePurchase('${p.id}','rate',this.value)" oninput="updateLivePreview()"></td>
+      <td style="font-family:var(--f-mono);color:var(--muted);">${fmtMoney(cost)}</td>
+      <td><button class="batch-rm" onclick="removePurchase('${p.id}')">Remove</button></td>
+    </tr>`;
+  }).join('');
+}
+function addPurchase(){ CURRENT_PURCHASES.push({id:newBatchId(), materialId:'', materialName:'', qtyKg:0, rate:0}); renderPurchaseRows(); refreshRawMaterialDisplays(); updateLivePreview(); }
+function removePurchase(id){ CURRENT_PURCHASES = CURRENT_PURCHASES.filter(p=>p.id!==id); renderPurchaseRows(); refreshRawMaterialDisplays(); updateLivePreview(); }
+function updatePurchase(id, field, value){
+  const p = CURRENT_PURCHASES.find(x=>x.id===id);
+  if(p){ p[field] = parseFloat(value)||0; }
+  renderPurchaseRows(); refreshRawMaterialDisplays(); updateLivePreview();
+}
+function selectPurchaseMaterial(id, materialId){
+  const p = CURRENT_PURCHASES.find(x=>x.id===id);
+  if(!p) return;
+  p.materialId = materialId;
+  const mat = RAW_MATERIAL_MASTER.find(x=>x.id===materialId);
+  if(mat){ p.materialName = mat.name; if(!p.rate) p.rate = mat.rate; }
+  renderPurchaseRows(); refreshRawMaterialDisplays(); updateLivePreview();
+}
+
+/* ---------------- SKU batch rows (entry form) ---------------- */
+let CURRENT_SHEET_BATCHES = [];
+let CURRENT_UNDERLAY_BATCHES = [];
+
+function renderSheetBatchRows(){
+  const body = document.getElementById('sheetBatchBody');
+  if(CURRENT_SHEET_BATCHES.length===0){
+    body.innerHTML = `<tr><td colspan="3" class="batch-empty">No sheet SKUs added yet &mdash; click "Add sheet SKU" below.</td></tr>`;
+    return;
+  }
+  body.innerHTML = CURRENT_SHEET_BATCHES.map(b=>`
+    <tr>
+      <td><input type="text" class="spec-input" value="${b.spec||''}" placeholder="81x75x50-100" onchange="updateSheetBatch('${b.id}','spec',this.value)"></td>
+      <td><input type="number" min="0" step="any" value="${b.outputKg||''}" onchange="updateSheetBatch('${b.id}','outputKg',this.value)" oninput="updateLivePreview()"></td>
+      <td><button class="batch-rm" onclick="removeSheetBatch('${b.id}')">Remove</button></td>
+    </tr>`).join('');
+}
+function addSheetBatch(){
+  CURRENT_SHEET_BATCHES.push({id:newBatchId(), spec:'', outputKg:0});
+  renderSheetBatchRows(); updateLivePreview();
+}
+function removeSheetBatch(id){
+  CURRENT_SHEET_BATCHES = CURRENT_SHEET_BATCHES.filter(b=>b.id!==id);
+  renderSheetBatchRows(); updateLivePreview();
+}
+function updateSheetBatch(id, field, value){
+  const b = CURRENT_SHEET_BATCHES.find(x=>x.id===id);
+  if(b){ b[field] = field==='outputKg' ? (parseFloat(value)||0) : value; }
+  updateLivePreview();
+}
+
+function skuDropdownOptions(selectedId){
+  const opts = ['<option value="">— Custom / not in list —</option>'];
+  MASTER_SKUS.forEach(s=>{
+    opts.push(`<option value="${s.id}" ${s.id===selectedId?'selected':''}>${s.name} (${s.density}D, ${s.thicknessMM}mm)</option>`);
+  });
+  return opts.join('');
+}
+function renderUnderlayBatchRows(){
+  const body = document.getElementById('underlayBatchBody');
+  if(CURRENT_UNDERLAY_BATCHES.length===0){
+    body.innerHTML = `<tr><td colspan="9" class="batch-empty">No roll SKUs added yet &mdash; click "Add roll SKU" below.</td></tr>`;
+    return;
+  }
+  body.innerHTML = CURRENT_UNDERLAY_BATCHES.map(b=>{
+    const autoOutput = (Number(b.weightPerRoll)||0) * (Number(b.rollCount)||0);
+    const outputDisplay = (b.outputKgOverride!=null) ? b.outputKgOverride : (autoOutput ? Number(autoOutput.toFixed(2)) : '');
+    return `
+    <tr>
+      <td><select onchange="selectUnderlaySku('${b.id}', this.value)">${skuDropdownOptions(b.skuId)}</select></td>
+      <td><input type="number" min="0" step="any" value="${b.weightPerRoll||''}" onchange="updateUnderlayBatch('${b.id}','weightPerRoll',this.value)" oninput="updateLivePreview()"></td>
+      <td><input type="number" min="0" step="any" value="${b.frontCostPerRoll||''}" onchange="updateUnderlayBatch('${b.id}','frontCostPerRoll',this.value)" oninput="updateLivePreview()"></td>
+      <td><input type="number" min="0" step="any" value="${b.backCostPerRoll||''}" onchange="updateUnderlayBatch('${b.id}','backCostPerRoll',this.value)" oninput="updateLivePreview()"></td>
+      <td><input type="number" min="0" step="any" value="${b.bagCostPerRoll||''}" onchange="updateUnderlayBatch('${b.id}','bagCostPerRoll',this.value)" oninput="updateLivePreview()"></td>
+      <td><input type="number" min="0" step="any" value="${b.glueKg||''}" placeholder="auto" onchange="updateUnderlayBatch('${b.id}','glueKg',this.value)" oninput="updateLivePreview()"></td>
+      <td><input type="number" class="count-input" min="0" step="1" value="${b.rollCount||''}" onchange="updateUnderlayBatch('${b.id}','rollCount',this.value)" oninput="updateLivePreview()"></td>
+      <td><input type="number" min="0" step="any" value="${outputDisplay}" placeholder="auto" onchange="updateUnderlayBatch('${b.id}','outputKgOverride',this.value)" oninput="updateLivePreview()"></td>
+      <td><button class="batch-rm" onclick="removeUnderlayBatch('${b.id}')">Remove</button></td>
+    </tr>`;
+  }).join('');
+}
+function addUnderlayBatch(){
+  CURRENT_UNDERLAY_BATCHES.push({id:newBatchId(), skuId:'', weightPerRoll:0, frontCostPerRoll:0, backCostPerRoll:0, bagCostPerRoll:0, glueKg:0, glueAuto:true, rollCount:0, outputKgOverride:null});
+  renderUnderlayBatchRows(); updateLivePreview();
+}
+function removeUnderlayBatch(id){
+  CURRENT_UNDERLAY_BATCHES = CURRENT_UNDERLAY_BATCHES.filter(b=>b.id!==id);
+  renderUnderlayBatchRows(); updateLivePreview();
+}
+function updateUnderlayBatch(id, field, value){
+  const b = CURRENT_UNDERLAY_BATCHES.find(x=>x.id===id);
+  if(!b) return;
+  if(field==='outputKgOverride'){
+    b.outputKgOverride = value===''? null : (parseFloat(value)||0);
+  } else if(field==='glueKg'){
+    b.glueKg = value===''? 0 : (parseFloat(value)||0);
+    b.glueAuto = false; // user took manual control of glue for this SKU
+    if(value===''){ b.glueAuto = true; b.glueKg = Number(((b.rollCount||0)*PRICING.glueKgPerRoll).toFixed(2)); }
+  } else if(field==='rollCount'){
+    b.rollCount = value===''? 0 : (parseFloat(value)||0);
+    if(b.glueAuto !== false){ b.glueKg = Number((b.rollCount*PRICING.glueKgPerRoll).toFixed(2)); }
+    renderUnderlayBatchRows(); // refresh glue kg + output kg (auto) shown in the row
+  } else {
+    b[field] = value===''? 0 : (parseFloat(value)||0);
+    if(field==='weightPerRoll') renderUnderlayBatchRows(); // refresh output kg (auto)
+  }
+  updateLivePreview();
+}
+function selectUnderlaySku(id, skuId){
+  const b = CURRENT_UNDERLAY_BATCHES.find(x=>x.id===id);
+  if(!b) return;
+  b.skuId = skuId;
+  if(skuId){
+    const sku = MASTER_SKUS.find(s=>s.id===skuId);
+    if(sku){
+      const costs = computeSkuCosts(sku, PRICING);
+      b.weightPerRoll = Number(costs.weightPerRoll.toFixed(3));
+      b.frontCostPerRoll = Number(costs.frontCostPerRoll.toFixed(2));
+      b.backCostPerRoll = Number(costs.backCostPerRoll.toFixed(2));
+      b.bagCostPerRoll = Number(costs.bagCostPerRoll.toFixed(2));
+      if(b.glueAuto !== false){ b.glueKg = Number(((b.rollCount||0)*PRICING.glueKgPerRoll).toFixed(2)); }
+    }
+  }
+  renderUnderlayBatchRows(); updateLivePreview();
+}
+
+/* ---------------- dashboard ---------------- */
+function populateDashDateSelect(){
+  const sel = document.getElementById('dashDate');
+  const dates = Object.keys(ENTRIES).sort().reverse();
+  sel.innerHTML = dates.map(d=>`<option value="${d}">${d}</option>`).join('');
+  if(dates.length===0){
+    document.getElementById('dashEmpty').style.display='block';
+    document.getElementById('dashContent').style.display='none';
+  } else {
+    document.getElementById('dashEmpty').style.display='none';
+    document.getElementById('dashContent').style.display='block';
+  }
+}
+
+function stackBarHTML(catObj, total){
+  const labels = {raw:'Raw Material', labor:'Labor', elec:'Electricity', consum:'Consumables (lamination)', other:'Other Direct', oh:'Overhead'};
+  const cats = [
+    ['raw','cat-raw'], ['labor','cat-labor'], ['elec','cat-elec'],
+    ['consum','cat-consum'], ['other','cat-other'], ['oh','cat-oh']
+  ];
+  if(total<=0) return '<div style="width:100%;background:var(--panel3);"></div>';
+  return cats.map(([key,cls])=>{
+    const pct = Math.max(0,(catObj[key]/total)*100);
+    return pct>0 ? `<div class="${cls}" style="width:${pct}%;" title="${labels[key]}: ${fmtMoney(catObj[key])} (${pct.toFixed(1)}%)"></div>` : '';
+  }).join('');
+}
+function compositionTooltip(catObj, total){
+  const labels = [['raw','Raw Material'],['labor','Labor'],['elec','Electricity'],['consum','Consumables (lamination)'],['other','Other Direct'],['oh','Overhead']];
+  if(total<=0) return 'No cost recorded';
+  return labels.map(([key,label])=>{
+    const pct = (catObj[key]/total)*100;
+    return `${label}: ${fmtMoney(catObj[key])} (${pct.toFixed(1)}%)`;
+  }).join('\n');
+}
+
+function renderSkuTable(c){
+  const rows = [];
+  c.sheets.batches.forEach(b=>{
+    rows.push(`<tr>
+      <td class="line-amber" style="color:var(--amber);">Sheet</td>
+      <td>${b.spec || '&mdash;'}</td>
+      <td>${fmtKg(b.outputKg)}</td>
+      <td>&mdash;</td>
+      <td>${fmtMoney(b.processCost)}</td>
+      <td class="cost">${fmtMoney(b.totalCost)}</td>
+      <td class="cost">${fmtMoney(b.costPerKg)}</td>
+      <td>&mdash;</td>
+    </tr>`);
+  });
+  c.underlay.batches.forEach(b=>{
+    rows.push(`<tr>
+      <td class="line-steel" style="color:var(--steel);">Roll</td>
+      <td>${b.skuName || 'Custom'}</td>
+      <td>${fmtKg(b.outputKg)}${b.rollCount?' &middot; '+b.rollCount+' rolls':''}</td>
+      <td>${fmtMoney(b.materialsCost)}</td>
+      <td>${fmtMoney(b.processCost)}</td>
+      <td class="cost">${fmtMoney(b.totalCost)}</td>
+      <td class="cost">${fmtMoney(b.costPerKg)}</td>
+      <td>${b.costPerRoll!=null ? fmtMoney(b.costPerRoll) : '&mdash;'}</td>
+    </tr>`);
+  });
+  document.getElementById('skuResultBody').innerHTML = rows.length ? rows.join('') :
+    `<tr><td colspan="8" class="batch-empty">No SKU batches logged for this date.</td></tr>`;
+  document.getElementById('skuNote').textContent =
+    `Process cost is this SKU's share of shared foaming + line labor/electricity/overhead, spread by weight (₹${c.sheets.ratePerKg.toFixed(1)}/kg for sheets, ₹${c.underlay.ratePerKg.toFixed(1)}/kg for underlay this day). Materials cost is that SKU's own lamination consumption.`;
+}
+
+function renderDashboard(){
+  const sel = document.getElementById('dashDate');
+  const d = sel.value || sel.options[0]?.value;
+  if(!d) return;
+  const entry = ENTRIES[d];
+  if(!entry) return;
+  const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
+  const c = computeDay(entry, SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{});
+
+  document.getElementById('skuDateLabel').textContent = d;
+
+  document.getElementById('kpiSheetCost').innerHTML = fmtMoney(c.sheets.perKg) + '<small>/kg</small>';
+  document.getElementById('kpiSheetOut').textContent = fmtKg(c.sheets.outputKg) + ' produced &middot; ' + c.sheets.batches.length + ' SKUs';
+  document.getElementById('kpiUnderlayCost').innerHTML = fmtMoney(c.underlay.perKg) + '<small>/kg</small>';
+  document.getElementById('kpiUnderlayOut').innerHTML = fmtKg(c.underlay.outputKg) + ' produced &middot; ' + (c.underlay.rollCount||0) + ' rolls, ' + c.underlay.batches.length + ' SKUs';
+  document.getElementById('kpiBlended').innerHTML = fmtMoney(c.blended) + '<small>/kg</small>';
+  document.getElementById('kpiTotalOut').textContent = fmtKg(c.totalOut) + ' total output';
+  document.getElementById('kpiTotalCost').textContent = fmtMoney(c.totalCost);
+  document.getElementById('kpiWastage').textContent = 'Wastage: ' + fmtKg(c.sheets.wastageKg + c.underlay.wastageKg);
+  document.getElementById('kpiSheetConversion').innerHTML = fmtMoney(c.sheets.conversionPerKg) + '<small>/kg</small>';
+  document.getElementById('kpiUnderlayConversion').innerHTML = fmtMoney(c.underlay.conversionPerKg) + '<small>/kg</small>';
+
+  renderSkuTable(c);
+
+  document.getElementById('sheetStackBar').innerHTML = stackBarHTML(c.sheets, c.sheets.total);
+  document.getElementById('sheetStackTotal').textContent = fmtMoney(c.sheets.total) + ' total';
+  document.getElementById('sheetStackTotal').title = compositionTooltip(c.sheets, c.sheets.total);
+  document.getElementById('underlayStackBar').innerHTML = stackBarHTML(c.underlay, c.underlay.total);
+  document.getElementById('underlayStackTotal').textContent = fmtMoney(c.underlay.total) + ' total';
+  document.getElementById('underlayStackTotal').title = compositionTooltip(c.underlay, c.underlay.total);
+
+  renderTrendCharts();
+}
+
+/* ---------------- lightweight self-contained SVG charts (no external library — works fully offline) ---------------- */
+function svgLineChart(containerId, labels, series){
+  const W=640, H=230, padL=44, padR=14, padT=14, padB=26;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  const n = labels.length;
+  const allVals = series.flatMap(s=>s.data).filter(v=>isFinite(v));
+  const maxV = Math.max(1, ...allVals);
+  const minV = Math.min(0, ...allVals);
+  const xStep = n>1 ? plotW/(n-1) : 0;
+  const xPos = i => padL + i*xStep;
+  const yPos = v => padT + plotH - ((v-minV)/((maxV-minV)||1))*plotH;
+
+  let grid='', ticks=4;
+  for(let t=0;t<=ticks;t++){
+    const v = minV + (maxV-minV)*t/ticks;
+    const y = yPos(v);
+    grid += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`;
+    grid += `<text x="${padL-6}" y="${y+3}" text-anchor="end" font-size="9" fill="#9c9686" font-family="IBM Plex Mono, monospace">${Math.round(v)}</text>`;
+  }
+  let xLabels='';
+  const step = Math.max(1, Math.ceil(n/7));
+  labels.forEach((l,i)=>{ if(i%step===0 || i===n-1) xLabels += `<text x="${xPos(i)}" y="${H-6}" text-anchor="middle" font-size="9" fill="#9c9686" font-family="IBM Plex Mono, monospace">${l}</text>`; });
+
+  let paths='';
+  series.forEach(s=>{
+    let d='';
+    s.data.forEach((v,i)=>{ const x=xPos(i), y=yPos(v); d += (i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1)+' '; });
+    paths += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2"/>`;
+    s.data.forEach((v,i)=>{ paths += `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(v).toFixed(1)}" r="2.6" fill="${s.color}"><title>${labels[i]} — ${s.name}: ${v}</title></circle>`; });
+  });
+
+  const legend = series.map(s=>`<span style="display:inline-flex;align-items:center;gap:5px;margin-right:16px;"><span style="width:9px;height:9px;background:${s.color};border-radius:2px;display:inline-block;"></span>${s.name}</span>`).join('');
+  document.getElementById(containerId).innerHTML =
+    (n===0 ? '<div class="empty-state" style="padding:30px 0;">No data yet.</div>' :
+    `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:220px;display:block;">${grid}${paths}${xLabels}</svg>
+     <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9c9686;margin-top:6px;">${legend}</div>`);
+}
+
+function svgStackedBarChart(containerId, labels, series){
+  const W=640, H=230, padL=44, padR=14, padT=14, padB=26;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  const n = labels.length;
+  const totals = labels.map((_,i)=> series.reduce((s,ser)=>s+(ser.data[i]||0),0));
+  const maxV = Math.max(1, ...totals);
+  const xStep = n>0 ? plotW/n : 0;
+  const barW = Math.min(34, xStep*0.55);
+  const xCenter = i => padL + xStep*i + xStep/2;
+  const yPos = v => padT + plotH - (v/maxV)*plotH;
+
+  let grid='', ticks=4;
+  for(let t=0;t<=ticks;t++){
+    const v = maxV*t/ticks;
+    const y = yPos(v);
+    grid += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`;
+    grid += `<text x="${padL-6}" y="${y+3}" text-anchor="end" font-size="9" fill="#9c9686" font-family="IBM Plex Mono, monospace">${Math.round(v)}</text>`;
+  }
+  let xLabels='';
+  const step = Math.max(1, Math.ceil(n/7));
+  labels.forEach((l,i)=>{ if(i%step===0 || i===n-1) xLabels += `<text x="${xCenter(i)}" y="${H-6}" text-anchor="middle" font-size="9" fill="#9c9686" font-family="IBM Plex Mono, monospace">${l}</text>`; });
+
+  let bars='';
+  labels.forEach((l,i)=>{
+    let cum=0;
+    series.forEach(ser=>{
+      const v = ser.data[i]||0;
+      const yTop = yPos(cum+v), yBase = yPos(cum);
+      bars += `<rect x="${(xCenter(i)-barW/2).toFixed(1)}" y="${yTop.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0,yBase-yTop).toFixed(1)}" fill="${ser.color}"><title>${l} — ${ser.name}: ${v}</title></rect>`;
+      cum += v;
+    });
+  });
+
+  const legend = series.map(s=>`<span style="display:inline-flex;align-items:center;gap:5px;margin-right:16px;"><span style="width:9px;height:9px;background:${s.color};border-radius:2px;display:inline-block;"></span>${s.name}</span>`).join('');
+  document.getElementById(containerId).innerHTML =
+    (n===0 ? '<div class="empty-state" style="padding:30px 0;">No data yet.</div>' :
+    `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:220px;display:block;">${grid}${bars}${xLabels}</svg>
+     <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9c9686;margin-top:6px;">${legend}</div>`);
+}
+
+function renderTrendCharts(){
+  const dates = Object.keys(ENTRIES).sort().slice(-30);
+  const labels = dates.map(d=>d.slice(5));
+  const sheetVals = [], underlayVals = [], sheetOut = [], underlayOut = [];
+  const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
+  dates.forEach(d=>{
+    const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{});
+    sheetVals.push(Number(c.sheets.perKg.toFixed(2)));
+    underlayVals.push(Number(c.underlay.perKg.toFixed(2)));
+    sheetOut.push(Number(c.sheets.outputKg.toFixed(1)));
+    underlayOut.push(Number(c.underlay.outputKg.toFixed(1)));
+  });
+
+  svgLineChart('trendChart', labels, [
+    {name:'Sheets avg ₹/kg', data:sheetVals, color:'#e8a33d'},
+    {name:'Underlay avg ₹/kg', data:underlayVals, color:'#5b8aa6'}
+  ]);
+  svgStackedBarChart('outputChart', labels, [
+    {name:'Sheets kg', data:sheetOut, color:'#e8a33d'},
+    {name:'Underlay kg', data:underlayOut, color:'#5b8aa6'}
+  ]);
+}
+
+document.getElementById('dashDate').addEventListener('change', renderDashboard);
+
+/* ---------------- entry form ---------------- */
+const ENTRY_FIELD_IDS = ['s_laborCost','s_elecUnits','s_dieselCost','s_maintCost',
+  's_sheetBlocksKg','s_underlayBlocksKg','sh_laborCost','sh_elecUnits','sh_wastageKg',
+  'u_peelLaborCost','u_peelElecUnits','u_lamLaborCost','u_lamElecUnits','u_wastageKg'];
+
+function fillEntryForm(entry){
+  ENTRY_FIELD_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.value = entry[id] || ''; });
+  CURRENT_PURCHASES = (entry.purchases||[]).map(p=>({...p}));
+  CURRENT_SHEET_RAWMATS = (entry.sh_rawMaterials||[]).map(m=>({...m}));
+  CURRENT_UNDERLAY_RAWMATS = (entry.u_rawMaterials||[]).map(m=>({...m}));
+  CURRENT_SHEET_BATCHES = (entry.sh_batches||[]).map(b=>({...b}));
+  CURRENT_UNDERLAY_BATCHES = (entry.u_batches||[]).map(b=>({...b}));
+  renderPurchaseRows();
+  renderSheetRawRows();
+  renderUnderlayRawRows();
+  renderSheetBatchRows();
+  renderUnderlayBatchRows();
+  updateLivePreview();
+}
+function clearEntryForm(){
+  const blank = blankEntry(document.getElementById('entryDate').value);
+  fillEntryForm(blank);
+  document.getElementById('entryStatus').textContent = '';
+}
+function readEntryForm(){
+  const date = document.getElementById('entryDate').value;
+  const e = blankEntry(date);
+  ENTRY_FIELD_IDS.forEach(id=>{ e[id] = num(id); });
+  e.purchases = CURRENT_PURCHASES.map(p=>({id:p.id, materialId:p.materialId||'', materialName:p.materialName||'', qtyKg:Number(p.qtyKg)||0, rate:Number(p.rate)||0}));
+  e.sh_rawMaterials = CURRENT_SHEET_RAWMATS.map(m=>({id:m.id, materialId:m.materialId||'', materialName:m.materialName||'', qtyKg:Number(m.qtyKg)||0}));
+  e.u_rawMaterials = CURRENT_UNDERLAY_RAWMATS.map(m=>({id:m.id, materialId:m.materialId||'', materialName:m.materialName||'', qtyKg:Number(m.qtyKg)||0}));
+  e.sh_batches = CURRENT_SHEET_BATCHES.map(b=>({id:b.id, spec:b.spec||'', outputKg: Number(b.outputKg)||0}));
+  e.u_batches = CURRENT_UNDERLAY_BATCHES.map(b=>({
+    id:b.id, skuId:b.skuId||'',
+    skuName: b.skuId ? (MASTER_SKUS.find(s=>s.id===b.skuId)||{}).name || '' : 'Custom',
+    weightPerRoll:Number(b.weightPerRoll)||0,
+    frontCostPerRoll:Number(b.frontCostPerRoll)||0, backCostPerRoll:Number(b.backCostPerRoll)||0,
+    bagCostPerRoll:Number(b.bagCostPerRoll)||0,
+    glueKg:Number(b.glueKg)||0, glueAuto: b.glueAuto!==false, rollCount:Number(b.rollCount)||0,
+    outputKgOverride: (b.outputKgOverride!=null && b.outputKgOverride!=='') ? Number(b.outputKgOverride) : null
+  }));
+  return e;
+}
+function currentEditingLedgerRates(){
+  const e = readEntryForm();
+  const date = e.date || todayStr();
+  const tempEntries = {...ENTRIES, [date]: e};
+  const ledger = computeInventoryLedger(tempEntries, RAW_MATERIAL_MASTER);
+  return { date, materialRates: (ledger.ledgerByDate[date]||{}).perMaterial || {}, entry: e };
+}
+function updateLivePreview(){
+  const { entry:e, materialRates } = currentEditingLedgerRates();
+  const c = computeDay(e, SETTINGS, materialRates);
+  document.getElementById('livePreview').innerHTML = `
+    <div class="preview-item"><span class="l">Sheets avg ₹/kg</span><span class="v amber">${fmtMoney(c.sheets.perKg)}</span></div>
+    <div class="preview-item"><span class="l">Underlay avg ₹/kg</span><span class="v steel">${fmtMoney(c.underlay.perKg)}</span></div>
+    <div class="preview-item"><span class="l">Underlay avg ₹/roll</span><span class="v steel">${fmtMoney(c.underlay.perRoll)}</span></div>
+    <div class="preview-item"><span class="l">Blended ₹/kg</span><span class="v">${fmtMoney(c.blended)}</span></div>
+    <div class="preview-item"><span class="l">Total day cost</span><span class="v">${fmtMoney(c.totalCost)}</span></div>
+  `;
+}
+ENTRY_FIELD_IDS.forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', updateLivePreview);
+});
+
+document.getElementById('entryDate').addEventListener('change', ()=>{
+  const d = document.getElementById('entryDate').value;
+  const existing = ENTRIES[d];
+  fillEntryForm(existing || blankEntry(d));
+  document.getElementById('deleteEntryBtn').style.display = existing ? 'inline-block' : 'none';
+  document.getElementById('entryStatus').textContent = existing ? 'Editing existing log for '+d : 'New entry for '+d;
+});
+
+async function saveEntry(){
+  const e = readEntryForm();
+  if(!e.date){ document.getElementById('entryStatus').textContent = 'Pick a date first.'; document.getElementById('entryStatus').className='status-msg err'; return; }
+  const ok = await storageSet('daily:'+e.date, e);
+  const statusEl = document.getElementById('entryStatus');
+  ENTRIES[e.date] = e; // keep it in memory for this session even if the central save failed
+  document.getElementById('deleteEntryBtn').style.display = 'inline-block';
+  populateDashDateSelect();
+  document.getElementById('dashDate').value = e.date;
+  renderDashboard();
+  showStorageWarningIfNeeded();
+  if(ok){
+    statusEl.textContent = 'Saved log for '+e.date+'.';
+    statusEl.className = 'status-msg';
+  } else {
+    statusEl.textContent = 'Kept in this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Export a backup from Settings before closing this window.';
+    statusEl.className = 'status-msg err';
+  }
+}
+async function deleteCurrentEntry(){
+  const d = document.getElementById('entryDate').value;
+  if(!ENTRIES[d]) return;
+  if(!confirm('Delete the logged entry for '+d+'? This cannot be undone.')) return;
+  await storageDelete('daily:'+d);
+  delete ENTRIES[d];
+  clearEntryForm();
+  document.getElementById('deleteEntryBtn').style.display = 'none';
+  populateDashDateSelect();
+  renderDashboard();
+  renderHistory();
+}
+
+/* ---------------- history ---------------- */
+function renderHistory(){
+  const dates = Object.keys(ENTRIES).sort().reverse();
+  const body = document.getElementById('historyBody');
+  if(dates.length===0){
+    document.getElementById('historyEmpty').style.display='block';
+    body.innerHTML='';
+    return;
+  }
+  document.getElementById('historyEmpty').style.display='none';
+  const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
+  body.innerHTML = dates.map(d=>{
+    const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{});
+    return `<tr>
+      <td>${d}</td>
+      <td>${c.sheets.batches.length}</td>
+      <td>${fmtKg(c.sheets.outputKg)}</td>
+      <td>${fmtMoney(c.sheets.perKg)}</td>
+      <td>${c.underlay.batches.length}</td>
+      <td>${fmtKg(c.underlay.outputKg)}</td>
+      <td>${fmtMoney(c.underlay.perKg)}</td>
+      <td>${fmtMoney(c.totalCost)}</td>
+      <td>
+        <button class="link-btn" onclick="editFromHistory('${d}')">Edit</button>
+        <button class="link-btn del" onclick="deleteFromHistory('${d}')">Delete</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ---------------- inventory ---------------- */
+function renderInventory(){
+  const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
+  document.getElementById('inventoryAsOf').textContent = ledger.lastDate ? '— as of ' + ledger.lastDate : '— no production days logged yet';
+
+  const stockBody = document.getElementById('inventoryStockBody');
+  const materialsWithActivity = RAW_MATERIAL_MASTER.filter(m=>{
+    const s = ledger.finalState[m.id];
+    return s && (Math.abs(s.qty) > 0.001 || s.avgCost > 0);
+  });
+  if(materialsWithActivity.length===0){
+    document.getElementById('inventoryEmpty').style.display='block';
+    stockBody.innerHTML = '';
+  } else {
+    document.getElementById('inventoryEmpty').style.display='none';
+    stockBody.innerHTML = materialsWithActivity.map(m=>{
+      const s = ledger.finalState[m.id] || {qty:0, avgCost:0};
+      const negative = s.qty < -0.001;
+      const value = s.qty * s.avgCost;
+      return `<tr>
+        <td>${m.name}</td>
+        <td style="color:${negative?'var(--bad)':'var(--text)'};font-family:var(--f-mono);">${fmtKg(s.qty)}</td>
+        <td style="font-family:var(--f-mono);">${fmtMoney(s.avgCost)}</td>
+        <td style="font-family:var(--f-mono);">${fmtMoney(value)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const purchaseRows = [];
+  Object.keys(ENTRIES).sort().reverse().forEach(date=>{
+    (ENTRIES[date].purchases||[]).forEach(p=>{
+      if(!p.materialId || !(Number(p.qtyKg)>0)) return;
+      const mat = RAW_MATERIAL_MASTER.find(m=>m.id===p.materialId);
+      purchaseRows.push({date, name: mat ? mat.name : (p.materialName||'Unknown'), qty:Number(p.qtyKg)||0, rate:Number(p.rate)||0});
+    });
+  });
+  const purchaseBody = document.getElementById('inventoryPurchaseBody');
+  if(purchaseRows.length===0){
+    document.getElementById('inventoryPurchaseEmpty').style.display='block';
+    purchaseBody.innerHTML = '';
+  } else {
+    document.getElementById('inventoryPurchaseEmpty').style.display='none';
+    purchaseBody.innerHTML = purchaseRows.map(p=>`<tr>
+      <td>${p.date}</td><td>${p.name}</td><td>${fmtKg(p.qty)}</td><td>${fmtMoney(p.rate)}</td><td>${fmtMoney(p.qty*p.rate)}</td>
+    </tr>`).join('');
+  }
+}
+
+function editFromHistory(d){
+  document.querySelector('nav.tabs button[data-tab="entry"]').click();
+  document.getElementById('entryDate').value = d;
+  fillEntryForm(ENTRIES[d]);
+  document.getElementById('deleteEntryBtn').style.display='inline-block';
+  document.getElementById('entryStatus').textContent = 'Editing existing log for '+d;
+}
+async function deleteFromHistory(d){
+  if(!confirm('Delete the logged entry for '+d+'? This cannot be undone.')) return;
+  await storageDelete('daily:'+d);
+  delete ENTRIES[d];
+  populateDashDateSelect();
+  renderHistory();
+  renderDashboard();
+}
+
+/* ---------------- settings ---------------- */
+function fillSettingsForm(){
+  document.getElementById('set_elecRate').value = SETTINGS.elecRate;
+  document.getElementById('set_rent').value = SETTINGS.rent;
+  document.getElementById('set_admin').value = SETTINGS.admin;
+  document.getElementById('set_dep').value = SETTINGS.dep;
+  document.getElementById('set_other').value = SETTINGS.other;
+  document.getElementById('set_prodDays').value = SETTINGS.prodDays;
+}
+async function saveSettings(){
+  SETTINGS = {
+    elecRate: num('set_elecRate'), rent: num('set_rent'), admin: num('set_admin'),
+    dep: num('set_dep'), other: num('set_other'), prodDays: num('set_prodDays') || 26
+  };
+  const ok = await storageSet('settings', SETTINGS);
+  const el = document.getElementById('settingsStatus');
+  el.textContent = ok ? 'Settings saved.' : 'Kept for this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Use Export data to back it up.';
+  el.className = ok ? 'status-msg' : 'status-msg err';
+  showStorageWarningIfNeeded();
+  renderDashboard();
+  updateLivePreview();
+}
+function fillPricingForm(){
+  document.getElementById('p_nonwovenPlain').value = PRICING.nonwovenPlain;
+  document.getElementById('p_nonwovenPrinted').value = PRICING.nonwovenPrinted;
+  document.getElementById('p_nonwovenWidthM').value = PRICING.nonwovenWidthM;
+  document.getElementById('p_nonwovenGSM').value = PRICING.nonwovenGSM;
+  document.getElementById('p_paperBrown').value = PRICING.paperBrown;
+  document.getElementById('p_paperWhite').value = PRICING.paperWhite;
+  document.getElementById('p_peFilm').value = PRICING.peFilm;
+  document.getElementById('p_silverFoil').value = PRICING.silverFoil;
+  document.getElementById('p_printedBag').value = PRICING.printedBag;
+  document.getElementById('p_otherBag').value = PRICING.otherBag;
+  document.getElementById('p_glueRate').value = PRICING.glueRate;
+  document.getElementById('p_glueKgPerRoll').value = PRICING.glueKgPerRoll;
+}
+async function savePricing(){
+  PRICING = {
+    nonwovenPlain:num('p_nonwovenPlain'), nonwovenPrinted:num('p_nonwovenPrinted'),
+    nonwovenWidthM:num('p_nonwovenWidthM'), nonwovenGSM:num('p_nonwovenGSM'),
+    paperBrown:num('p_paperBrown'), paperWhite:num('p_paperWhite'),
+    peFilm:num('p_peFilm'), silverFoil:num('p_silverFoil'),
+    printedBag:num('p_printedBag'), otherBag:num('p_otherBag'),
+    glueRate:num('p_glueRate'), glueKgPerRoll:num('p_glueKgPerRoll')
+  };
+  const ok = await storageSet('roll_pricing', PRICING);
+  const el = document.getElementById('pricingStatus');
+  el.textContent = ok ? 'Rates saved. New SKU selections will use these — existing saved batches keep their locked-in per-roll cost until re-selected.' : 'Kept for this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Use Export data to back it up.';
+  el.className = ok ? 'status-msg' : 'status-msg err';
+  showStorageWarningIfNeeded();
+  renderDashboard();
+}
+
+function renderMasterSkuTable(){
+  const body = document.getElementById('masterSkuBody');
+  body.innerHTML = MASTER_SKUS.map(s=>`
+    <tr>
+      <td><input type="text" class="spec-input" value="${s.name}" onchange="updateMasterSku('${s.id}','name',this.value)"></td>
+      <td><input type="text" class="spec-input" value="${s.front}" onchange="updateMasterSku('${s.id}','front',this.value)"></td>
+      <td><input type="text" class="spec-input" value="${s.back}" onchange="updateMasterSku('${s.id}','back',this.value)"></td>
+      <td><input type="text" class="spec-input" value="${s.bag}" onchange="updateMasterSku('${s.id}','bag',this.value)"></td>
+      <td><input type="number" min="0" step="any" value="${s.lengthM}" onchange="updateMasterSku('${s.id}','lengthM',this.value)"></td>
+      <td><input type="number" min="0" step="any" value="${s.widthM}" onchange="updateMasterSku('${s.id}','widthM',this.value)"></td>
+      <td><input type="number" min="0" step="any" value="${s.thicknessMM}" onchange="updateMasterSku('${s.id}','thicknessMM',this.value)"></td>
+      <td><input type="number" min="0" step="any" value="${s.density}" onchange="updateMasterSku('${s.id}','density',this.value)"></td>
+      <td style="font-family:var(--f-mono);color:var(--muted);">${skuWeightPerRoll(s).toFixed(2)}</td>
+      <td><button class="batch-rm" onclick="removeMasterSku('${s.id}')">Remove</button></td>
+    </tr>`).join('');
+}
+function addMasterSku(){
+  MASTER_SKUS.push({id:'sku_'+Date.now().toString(36), name:'New SKU', front:'NONWOVEN', back:'NONWOVEN', bag:'Clear Bag', lengthM:11.5, widthM:1.37, thicknessMM:10, density:70});
+  renderMasterSkuTable();
+}
+function removeMasterSku(id){
+  MASTER_SKUS = MASTER_SKUS.filter(s=>s.id!==id);
+  renderMasterSkuTable();
+}
+function updateMasterSku(id, field, value){
+  const s = MASTER_SKUS.find(x=>x.id===id);
+  if(!s) return;
+  const numericFields = ['lengthM','widthM','thicknessMM','density'];
+  s[field] = numericFields.includes(field) ? (parseFloat(value)||0) : value;
+  renderMasterSkuTable();
+}
+async function saveMasterSkus(){
+  const ok = await storageSet('roll_master_skus', MASTER_SKUS);
+  const el = document.getElementById('masterSkuStatus');
+  el.textContent = ok ? 'SKU master saved.' : 'Kept for this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Use Export data to back it up.';
+  el.className = ok ? 'status-msg' : 'status-msg err';
+  showStorageWarningIfNeeded();
+}
+
+function renderRawMaterialMasterTable(){
+  const body = document.getElementById('rawMaterialMasterBody');
+  body.innerHTML = RAW_MATERIAL_MASTER.map(m=>`
+    <tr>
+      <td><input type="text" class="spec-input" value="${m.name}" onchange="updateRawMaterialMaster('${m.id}','name',this.value)"></td>
+      <td><input type="number" min="0" step="any" value="${m.rate}" onchange="updateRawMaterialMaster('${m.id}','rate',this.value)"></td>
+      <td><input type="number" min="0" step="any" value="${m.openingQty||''}" onchange="updateRawMaterialMaster('${m.id}','openingQty',this.value)"></td>
+      <td><input type="number" min="0" step="any" value="${m.openingRate!=null?m.openingRate:''}" placeholder="= fallback" onchange="updateRawMaterialMaster('${m.id}','openingRate',this.value)"></td>
+      <td><button class="batch-rm" onclick="removeRawMaterialMaster('${m.id}')">Remove</button></td>
+    </tr>`).join('');
+}
+function addRawMaterial(){
+  RAW_MATERIAL_MASTER.push({id:'rm_'+Date.now().toString(36), name:'New material', rate:0, openingQty:0, openingRate:null});
+  renderRawMaterialMasterTable();
+}
+function removeRawMaterialMaster(id){
+  RAW_MATERIAL_MASTER = RAW_MATERIAL_MASTER.filter(m=>m.id!==id);
+  renderRawMaterialMasterTable();
+}
+function updateRawMaterialMaster(id, field, value){
+  const m = RAW_MATERIAL_MASTER.find(x=>x.id===id);
+  if(!m) return;
+  if(field==='name'){ m.name = value; }
+  else if(field==='openingRate'){ m.openingRate = value===''? null : (parseFloat(value)||0); }
+  else { m[field] = parseFloat(value)||0; }
+}
+async function saveRawMaterialMaster(){
+  const ok = await storageSet('raw_material_master', RAW_MATERIAL_MASTER);
+  const el = document.getElementById('rawMaterialStatus');
+  el.textContent = ok ? 'Raw material rates saved.' : 'Kept for this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Use Export data to back it up.';
+  el.className = ok ? 'status-msg' : 'status-msg err';
+  showStorageWarningIfNeeded();
+  refreshRawMaterialDisplays();
+}
+
+async function resetAllData(){
+  if(!confirm('This deletes ALL logged daily entries for everyone viewing this console. Continue?')) return;
+  const keys = await storageList('daily:');
+  await Promise.all(keys.map(k=>storageDelete(k)));
+  ENTRIES = {};
+  populateDashDateSelect();
+  renderDashboard();
+  renderHistory();
+  document.getElementById('settingsStatus').textContent = 'All daily entries cleared.';
+}
+
+/* ---------------- init ---------------- */
+async function init(){
+  document.getElementById('dashLoading').textContent = 'Checking storage...';
+  await checkStorageAvailable();
+  showStorageWarningIfNeeded();
+
+  document.getElementById('dashLoading').textContent = 'Loading...';
+  if(STORAGE_OK){
+    await loadSettings();
+    await loadPricing();
+    await loadMasterSkus();
+    await loadRawMaterialMaster();
+    await loadAllEntries();
+  }
+  document.getElementById('dashLoading').textContent = '';
+
+  fillSettingsForm();
+  fillPricingForm();
+  renderMasterSkuTable();
+  renderRawMaterialMasterTable();
+  document.getElementById('entryDate').value = todayStr();
+  const existingToday = ENTRIES[todayStr()];
+  fillEntryForm(existingToday || blankEntry(todayStr()));
+  document.getElementById('deleteEntryBtn').style.display = existingToday ? 'inline-block' : 'none';
+
+  populateDashDateSelect();
+  renderDashboard();
+}
+init();
+</script>
+</body>
+</html>
