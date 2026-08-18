@@ -160,6 +160,10 @@
   .sku-result-tbl td.cost{color:var(--text);font-weight:600;}
   .sku-result-tbl td.line-amber{border-left:3px solid var(--amber);}
   .sku-result-tbl td.line-steel{border-left:3px solid var(--steel);}
+  #compositionTable th.col-amber{color:var(--amber);}
+  #compositionTable th.col-steel{color:var(--steel);}
+  #compositionTable td.num{font-family:var(--f-mono);}
+  #compositionTable tr.total-row td{border-top:1px solid var(--border-lt);font-weight:600;color:var(--text);}
 </style>
 </head>
 <body>
@@ -265,6 +269,19 @@
           <span><i class="swatch cat-consum"></i>Consumables (lamination)</span>
           <span><i class="swatch cat-other"></i>Other Direct</span>
           <span><i class="swatch cat-oh"></i>Overhead</span>
+        </div>
+        <div class="hairline"></div>
+        <div class="tbl-wrap">
+          <table id="compositionTable">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th class="col-amber">Sheets ₹</th><th class="col-amber">Sheets %</th>
+                <th class="col-steel">Underlay ₹</th><th class="col-steel">Underlay %</th>
+              </tr>
+            </thead>
+            <tbody id="compositionTableBody"></tbody>
+          </table>
         </div>
       </div>
 
@@ -1213,6 +1230,29 @@ function compositionTooltip(catObj, total){
   }).join('\n');
 }
 
+function renderCompositionTable(c){
+  const labels = [['raw','Raw Material'],['labor','Labor'],['elec','Electricity'],['consum','Consumables (lamination)'],['other','Other Direct'],['oh','Overhead']];
+  const sTotal = c.sheets.total, uTotal = c.underlay.total;
+  const pct = (v,total) => total>0 ? ((v/total)*100).toFixed(1)+'%' : '—';
+  const rows = labels.map(([key,label])=>{
+    const sVal = c.sheets[key]||0, uVal = c.underlay[key]||0;
+    if(sVal<=0 && uVal<=0) return '';
+    return `<tr>
+      <td>${label}</td>
+      <td class="num">${sVal>0?fmtMoney(sVal):'—'}</td>
+      <td class="num">${sVal>0?pct(sVal,sTotal):'—'}</td>
+      <td class="num">${uVal>0?fmtMoney(uVal):'—'}</td>
+      <td class="num">${uVal>0?pct(uVal,uTotal):'—'}</td>
+    </tr>`;
+  }).join('');
+  const totalRow = `<tr class="total-row">
+    <td>Total</td>
+    <td class="num">${fmtMoney(sTotal)}</td><td class="num">100%</td>
+    <td class="num">${fmtMoney(uTotal)}</td><td class="num">100%</td>
+  </tr>`;
+  document.getElementById('compositionTableBody').innerHTML = (rows||'<tr><td colspan="5" class="batch-empty">No cost recorded for this date.</td></tr>') + (sTotal>0||uTotal>0 ? totalRow : '');
+}
+
 function renderSkuTable(c){
   const rows = [];
   c.sheets.batches.forEach(b=>{
@@ -1275,6 +1315,7 @@ function renderDashboard(){
   document.getElementById('underlayStackBar').innerHTML = stackBarHTML(c.underlay, c.underlay.total);
   document.getElementById('underlayStackTotal').textContent = fmtMoney(c.underlay.total) + ' total';
   document.getElementById('underlayStackTotal').title = compositionTooltip(c.underlay, c.underlay.total);
+  renderCompositionTable(c);
 
   renderTrendCharts();
 }
