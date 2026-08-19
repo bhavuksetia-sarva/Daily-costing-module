@@ -336,6 +336,7 @@
           <div class="field"><label>Foaming stage electricity <span class="unit">(kWh)</span></label><input type="number" id="s_elecUnits" min="0" step="any"></div>
           <div class="field"><label>Diesel / fuel <span class="unit">(₹)</span></label><input type="number" id="s_dieselCost" min="0" step="any"></div>
           <div class="field"><label>Repairs &amp; maintenance <span class="unit">(₹)</span></label><input type="number" id="s_maintCost" min="0" step="any"></div>
+          <div class="field"><label>Wood consumed <span class="unit">(kg)</span></label><input type="number" id="s_woodKg" min="0" step="any"></div>
         </div>
         <div class="hairline"></div>
         <div class="field-grid">
@@ -473,9 +474,10 @@
   <!-- ============ SETTINGS ============ -->
   <section class="view" id="view-settings">
     <div class="panel">
-      <h2>Electricity rate</h2>
+      <h2>Electricity, wood &amp; currency rates</h2>
       <div class="field-grid">
-        <div class="field"><label>Rate <span class="unit">(₹/unit)</span></label><input type="number" id="set_elecRate" min="0" step="any"></div>
+        <div class="field"><label>Electricity rate <span class="unit">(₹/unit)</span></label><input type="number" id="set_elecRate" min="0" step="any"></div>
+        <div class="field"><label>Wood rate <span class="unit">(₹/kg)</span></label><input type="number" id="set_woodRate" min="0" step="any"></div>
         <div class="field">
           <label>GBP exchange rate <span class="unit">(₹ per £)</span></label>
           <div style="display:flex;gap:8px;">
@@ -575,7 +577,7 @@
 </div>
 
 <script>
-const DEFAULT_SETTINGS = { elecRate: 8, rent: 150000, admin: 100000, dep: 50000, other: 30000, prodDays: 26, gbpRate: 105 };
+const DEFAULT_SETTINGS = { elecRate: 8, woodRate: 0, rent: 150000, admin: 100000, dep: 50000, other: 30000, prodDays: 26, gbpRate: 105 };
 let SETTINGS = {...DEFAULT_SETTINGS};
 let ENTRIES = {}; // dateStr -> entry object
 let batchIdCounter = 1;
@@ -898,7 +900,7 @@ function computeDay(e, settings, materialRates){
   const rate = settings.elecRate;
   const sharedLabor = e.s_laborCost;
   const sharedElec = e.s_elecUnits*rate;
-  const sharedOther = e.s_dieselCost + e.s_maintCost;
+  const sharedOther = e.s_dieselCost + e.s_maintCost + (e.s_woodKg||0)*(settings.woodRate||0);
 
   const totalBlocks = e.s_sheetBlocksKg + e.s_underlayBlocksKg;
   const sheetRatio = totalBlocks>0 ? e.s_sheetBlocksKg/totalBlocks : 0;
@@ -1009,7 +1011,7 @@ function blankEntry(date){
     date,
     gbpRateUsed: (typeof SETTINGS!=='undefined' && SETTINGS.gbpRate) || DEFAULT_SETTINGS.gbpRate,
     purchases:[],
-    s_laborCost:0,s_elecUnits:0,s_dieselCost:0,s_maintCost:0,
+    s_laborCost:0,s_elecUnits:0,s_dieselCost:0,s_maintCost:0,s_woodKg:0,
     s_sheetBlocksKg:0,s_underlayBlocksKg:0,
     sh_laborCost:0,sh_elecUnits:0,sh_wastageKg:0,
     sh_rawMaterials:[],
@@ -1478,7 +1480,7 @@ function renderTrendCharts(){
 document.getElementById('dashDate').addEventListener('change', renderDashboard);
 
 /* ---------------- entry form ---------------- */
-const ENTRY_FIELD_IDS = ['s_laborCost','s_elecUnits','s_dieselCost','s_maintCost',
+const ENTRY_FIELD_IDS = ['s_laborCost','s_elecUnits','s_dieselCost','s_maintCost','s_woodKg',
   's_sheetBlocksKg','s_underlayBlocksKg','sh_laborCost','sh_elecUnits','sh_wastageKg',
   'u_peelLaborCost','u_peelElecUnits','u_lamLaborCost','u_lamElecUnits','u_wastageKg'];
 
@@ -1680,6 +1682,7 @@ async function deleteFromHistory(d){
 /* ---------------- settings ---------------- */
 function fillSettingsForm(){
   document.getElementById('set_elecRate').value = SETTINGS.elecRate;
+  document.getElementById('set_woodRate').value = SETTINGS.woodRate;
   document.getElementById('set_gbpRate').value = SETTINGS.gbpRate;
   document.getElementById('set_rent').value = SETTINGS.rent;
   document.getElementById('set_admin').value = SETTINGS.admin;
@@ -1689,7 +1692,7 @@ function fillSettingsForm(){
 }
 async function saveSettings(){
   SETTINGS = {
-    elecRate: num('set_elecRate'), gbpRate: num('set_gbpRate') || DEFAULT_SETTINGS.gbpRate,
+    elecRate: num('set_elecRate'), woodRate: num('set_woodRate'), gbpRate: num('set_gbpRate') || DEFAULT_SETTINGS.gbpRate,
     rent: num('set_rent'), admin: num('set_admin'),
     dep: num('set_dep'), other: num('set_other'), prodDays: num('set_prodDays') || 26
   };
