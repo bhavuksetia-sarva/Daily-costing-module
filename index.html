@@ -668,23 +668,45 @@ function computeSkuCosts(sku, pricing){
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function fmtMoney(n){ if(!isFinite(n)) n=0; return '₹' + Math.round(n).toLocaleString('en-IN'); }
 function fmtGBP(n, rate){ if(!isFinite(n)) n=0; rate = rate || (SETTINGS && SETTINGS.gbpRate) || DEFAULT_SETTINGS.gbpRate; return '£' + (n/rate).toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+const GBP_RATE_SOURCES = [
+  {
+    name: 'Frankfurter',
+    url: 'https://api.frankfurter.app/latest?from=GBP&to=INR',
+    parse: (data) => data && data.rates && data.rates.INR ? {rate: data.rates.INR, asOf: data.date} : null
+  },
+  {
+    name: 'open.er-api.com',
+    url: 'https://open.er-api.com/v6/latest/GBP',
+    parse: (data) => data && data.rates && data.rates.INR ? {rate: data.rates.INR, asOf: data.time_last_update_utc || ''} : null
+  },
+  {
+    name: 'fawazahmed0 currency-api',
+    url: 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/gbp.json',
+    parse: (data) => data && data.gbp && data.gbp.inr ? {rate: data.gbp.inr, asOf: data.date} : null
+  }
+];
 async function fetchLiveGBPRate(){
   const status = document.getElementById('gbpRateStatus');
-  status.textContent = 'Fetching live rate...';
-  status.className = 'status-msg';
-  try{
-    const resp = await fetch('https://api.frankfurter.app/latest?from=GBP&to=INR');
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
-    const data = await resp.json();
-    const rate = data && data.rates && data.rates.INR;
-    if(!rate) throw new Error('Unexpected response from exchange service');
-    document.getElementById('set_gbpRate').value = Number(rate.toFixed(2));
-    status.textContent = `Fetched ₹${rate.toFixed(2)}/£ as of ${data.date}. Click "Save settings" below to apply it.`;
+  const errors = [];
+  for(const source of GBP_RATE_SOURCES){
+    status.textContent = `Trying ${source.name}...`;
     status.className = 'status-msg';
-  }catch(e){
-    status.textContent = 'Could not fetch a live rate (' + (e.message||e) + '). Enter it manually instead.';
-    status.className = 'status-msg err';
+    try{
+      const resp = await fetch(source.url);
+      if(!resp.ok) throw new Error('HTTP '+resp.status);
+      const data = await resp.json();
+      const result = source.parse(data);
+      if(!result || !result.rate) throw new Error('unexpected response shape');
+      document.getElementById('set_gbpRate').value = Number(result.rate.toFixed(2));
+      status.textContent = `Fetched ₹${result.rate.toFixed(2)}/£ via ${source.name}${result.asOf ? ' as of '+result.asOf : ''}. Click "Save settings" below to apply it.`;
+      status.className = 'status-msg';
+      return;
+    }catch(e){
+      errors.push(source.name + ': ' + (e.message||e));
+    }
   }
+  status.textContent = 'Could not reach any exchange rate service (tried ' + GBP_RATE_SOURCES.map(s=>s.name).join(', ') + '). This usually means the network here blocks external sites, or an ad-blocker is intervening — enter the rate manually instead.';
+  status.className = 'status-msg err';
 }
 function fmtKg(n){ if(!isFinite(n)) n=0; return n.toLocaleString('en-IN', {maximumFractionDigits:1}) + ' kg'; }
 function num(id){ const el = document.getElementById(id); if(!el) return 0; const v = parseFloat(el.value); return isFinite(v) ? v : 0; }
