@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rebond Cost Console</title>
+<title>Daily Cost Console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -171,8 +171,8 @@
 
   <header>
     <div>
-      <p class="brand-eyebrow">P N M &middot; Rebonded Foam &amp; Underlay Division</p>
-      <h1>Rebond Cost Console</h1>
+      <p class="brand-eyebrow">SARVA FOAM INDUSTRIES LIMITED &middot; Rebonded Foam &amp; Underlay Division</p>
+      <h1>Daily Cost Console</h1>
       <p class="plant-line"><span class="dot-live"></span>Daily production cost tracking &mdash; sheets &amp; underlay lines, by SKU</p>
     </div>
     <nav class="tabs">
@@ -238,7 +238,7 @@
         <div class="tbl-wrap">
           <table class="sku-result-tbl">
             <thead>
-              <tr><th>Line</th><th>Spec</th><th>Output</th><th>Materials cost</th><th>Process cost</th><th>Total cost</th><th>Cost / kg</th><th>Cost / roll</th></tr>
+              <tr><th>Line</th><th>Spec</th><th>Output</th><th>Materials cost</th><th>Process cost</th><th>Total cost</th><th>Cost / kg</th><th>Cost / roll (₹)</th><th>Cost / roll (£)</th></tr>
             </thead>
             <tbody id="skuResultBody"></tbody>
           </table>
@@ -476,7 +476,16 @@
       <h2>Electricity rate</h2>
       <div class="field-grid">
         <div class="field"><label>Rate <span class="unit">(₹/unit)</span></label><input type="number" id="set_elecRate" min="0" step="any"></div>
+        <div class="field">
+          <label>GBP exchange rate <span class="unit">(₹ per £)</span></label>
+          <div style="display:flex;gap:8px;">
+            <input type="number" id="set_gbpRate" min="0" step="any" style="flex:1;">
+            <button class="btn btn-sm" type="button" onclick="fetchLiveGBPRate()">Refresh live rate</button>
+          </div>
+        </div>
       </div>
+      <div class="status-msg" id="gbpRateStatus"></div>
+      <div class="note-box">The GBP rate is only used to show a £ figure alongside ₹ — it never affects the actual ₹ costing. Each day's entry locks in whatever this rate was when you saved it, so old dates' £ figures stay fixed even if you update the rate later; only new saves pick up a changed rate. "Refresh live rate" pulls the current rate from a public exchange service — review it and click <strong>Save settings</strong> to apply it.</div>
     </div>
     <div class="panel">
       <h2>Monthly overheads <span class="accent">&mdash; spread across production days automatically</span></h2>
@@ -566,7 +575,7 @@
 </div>
 
 <script>
-const DEFAULT_SETTINGS = { elecRate: 8, rent: 150000, admin: 100000, dep: 50000, other: 30000, prodDays: 26 };
+const DEFAULT_SETTINGS = { elecRate: 8, rent: 150000, admin: 100000, dep: 50000, other: 30000, prodDays: 26, gbpRate: 105 };
 let SETTINGS = {...DEFAULT_SETTINGS};
 let ENTRIES = {}; // dateStr -> entry object
 let batchIdCounter = 1;
@@ -658,6 +667,25 @@ function computeSkuCosts(sku, pricing){
 
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function fmtMoney(n){ if(!isFinite(n)) n=0; return '₹' + Math.round(n).toLocaleString('en-IN'); }
+function fmtGBP(n, rate){ if(!isFinite(n)) n=0; rate = rate || (SETTINGS && SETTINGS.gbpRate) || DEFAULT_SETTINGS.gbpRate; return '£' + (n/rate).toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+async function fetchLiveGBPRate(){
+  const status = document.getElementById('gbpRateStatus');
+  status.textContent = 'Fetching live rate...';
+  status.className = 'status-msg';
+  try{
+    const resp = await fetch('https://api.frankfurter.app/latest?from=GBP&to=INR');
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const data = await resp.json();
+    const rate = data && data.rates && data.rates.INR;
+    if(!rate) throw new Error('Unexpected response from exchange service');
+    document.getElementById('set_gbpRate').value = Number(rate.toFixed(2));
+    status.textContent = `Fetched ₹${rate.toFixed(2)}/£ as of ${data.date}. Click "Save settings" below to apply it.`;
+    status.className = 'status-msg';
+  }catch(e){
+    status.textContent = 'Could not fetch a live rate (' + (e.message||e) + '). Enter it manually instead.';
+    status.className = 'status-msg err';
+  }
+}
 function fmtKg(n){ if(!isFinite(n)) n=0; return n.toLocaleString('en-IN', {maximumFractionDigits:1}) + ' kg'; }
 function num(id){ const el = document.getElementById(id); if(!el) return 0; const v = parseFloat(el.value); return isFinite(v) ? v : 0; }
 
@@ -735,7 +763,7 @@ function exportAllData(){
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = 'rebond-cost-console-backup-' + todayStr() + '.json';
+  a.href = url; a.download = 'daily-cost-console-backup-' + todayStr() + '.json';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   const el = document.getElementById('settingsStatus');
@@ -927,7 +955,7 @@ function computeDay(e, settings, materialRates){
 
   let consumTotal = 0;
   underlayBatches.forEach(b=>{
-    b.materialsCost = (b.frontCostPerRoll+b.backCostPerRoll+b.bagCostPerRoll)*b.rollCount + b.glueKg*(PRICING.glueRate||0);
+    b.materialsCost = (b.frontCostPerRoll+b.backCostPerRoll+b.bagCostPerRoll)*b.rollCount + b.glueKg*((b.glueRateUsed!=null ? b.glueRateUsed : PRICING.glueRate)||0);
     b.processCost = underlayRatePerKg * b.outputKg;
     b.totalCost = b.materialsCost + b.processCost;
     b.costPerKg = b.outputKg>0 ? b.totalCost/b.outputKg : 0;
@@ -957,6 +985,7 @@ function computeDay(e, settings, materialRates){
 function blankEntry(date){
   return {
     date,
+    gbpRateUsed: (typeof SETTINGS!=='undefined' && SETTINGS.gbpRate) || DEFAULT_SETTINGS.gbpRate,
     purchases:[],
     s_laborCost:0,s_elecUnits:0,s_dieselCost:0,s_maintCost:0,
     s_sheetBlocksKg:0,s_underlayBlocksKg:0,
@@ -1151,7 +1180,7 @@ function renderUnderlayBatchRows(){
   }).join('');
 }
 function addUnderlayBatch(){
-  CURRENT_UNDERLAY_BATCHES.push({id:newBatchId(), skuId:'', weightPerRoll:0, frontCostPerRoll:0, backCostPerRoll:0, bagCostPerRoll:0, glueKg:0, glueAuto:true, rollCount:0, outputKgOverride:null});
+  CURRENT_UNDERLAY_BATCHES.push({id:newBatchId(), skuId:'', weightPerRoll:0, frontCostPerRoll:0, backCostPerRoll:0, bagCostPerRoll:0, glueKg:0, glueRateUsed:PRICING.glueRate, glueAuto:true, rollCount:0, outputKgOverride:null});
   renderUnderlayBatchRows(); updateLivePreview();
 }
 function removeUnderlayBatch(id){
@@ -1165,11 +1194,12 @@ function updateUnderlayBatch(id, field, value){
     b.outputKgOverride = value===''? null : (parseFloat(value)||0);
   } else if(field==='glueKg'){
     b.glueKg = value===''? 0 : (parseFloat(value)||0);
+    b.glueRateUsed = PRICING.glueRate; // lock in today's glue rate, same as front/back/bag
     b.glueAuto = false; // user took manual control of glue for this SKU
     if(value===''){ b.glueAuto = true; b.glueKg = Number(((b.rollCount||0)*PRICING.glueKgPerRoll).toFixed(2)); }
   } else if(field==='rollCount'){
     b.rollCount = value===''? 0 : (parseFloat(value)||0);
-    if(b.glueAuto !== false){ b.glueKg = Number((b.rollCount*PRICING.glueKgPerRoll).toFixed(2)); }
+    if(b.glueAuto !== false){ b.glueKg = Number((b.rollCount*PRICING.glueKgPerRoll).toFixed(2)); b.glueRateUsed = PRICING.glueRate; }
     renderUnderlayBatchRows(); // refresh glue kg + output kg (auto) shown in the row
   } else {
     b[field] = value===''? 0 : (parseFloat(value)||0);
@@ -1189,7 +1219,7 @@ function selectUnderlaySku(id, skuId){
       b.frontCostPerRoll = Number(costs.frontCostPerRoll.toFixed(2));
       b.backCostPerRoll = Number(costs.backCostPerRoll.toFixed(2));
       b.bagCostPerRoll = Number(costs.bagCostPerRoll.toFixed(2));
-      if(b.glueAuto !== false){ b.glueKg = Number(((b.rollCount||0)*PRICING.glueKgPerRoll).toFixed(2)); }
+      if(b.glueAuto !== false){ b.glueKg = Number(((b.rollCount||0)*PRICING.glueKgPerRoll).toFixed(2)); b.glueRateUsed = PRICING.glueRate; }
     }
   }
   renderUnderlayBatchRows(); updateLivePreview();
@@ -1253,7 +1283,7 @@ function renderCompositionTable(c){
   document.getElementById('compositionTableBody').innerHTML = (rows||'<tr><td colspan="5" class="batch-empty">No cost recorded for this date.</td></tr>') + (sTotal>0||uTotal>0 ? totalRow : '');
 }
 
-function renderSkuTable(c){
+function renderSkuTable(c, gbpRate){
   const rows = [];
   c.sheets.batches.forEach(b=>{
     rows.push(`<tr>
@@ -1264,6 +1294,7 @@ function renderSkuTable(c){
       <td>${fmtMoney(b.processCost)}</td>
       <td class="cost">${fmtMoney(b.totalCost)}</td>
       <td class="cost">${fmtMoney(b.costPerKg)}</td>
+      <td>&mdash;</td>
       <td>&mdash;</td>
     </tr>`);
   });
@@ -1277,10 +1308,11 @@ function renderSkuTable(c){
       <td class="cost">${fmtMoney(b.totalCost)}</td>
       <td class="cost">${fmtMoney(b.costPerKg)}</td>
       <td>${b.costPerRoll!=null ? fmtMoney(b.costPerRoll) : '&mdash;'}</td>
+      <td>${b.costPerRoll!=null ? fmtGBP(b.costPerRoll, gbpRate) : '&mdash;'}</td>
     </tr>`);
   });
   document.getElementById('skuResultBody').innerHTML = rows.length ? rows.join('') :
-    `<tr><td colspan="8" class="batch-empty">No SKU batches logged for this date.</td></tr>`;
+    `<tr><td colspan="9" class="batch-empty">No SKU batches logged for this date.</td></tr>`;
   document.getElementById('skuNote').textContent =
     `Process cost is this SKU's share of shared foaming + line labor/electricity/overhead, spread by weight (₹${c.sheets.ratePerKg.toFixed(1)}/kg for sheets, ₹${c.underlay.ratePerKg.toFixed(1)}/kg for underlay this day). Materials cost is that SKU's own lamination consumption.`;
 }
@@ -1307,7 +1339,7 @@ function renderDashboard(){
   document.getElementById('kpiSheetConversion').innerHTML = fmtMoney(c.sheets.conversionPerKg) + '<small>/kg</small>';
   document.getElementById('kpiUnderlayConversion').innerHTML = fmtMoney(c.underlay.conversionPerKg) + '<small>/kg</small>';
 
-  renderSkuTable(c);
+  renderSkuTable(c, entry.gbpRateUsed || SETTINGS.gbpRate);
 
   document.getElementById('sheetStackBar').innerHTML = stackBarHTML(c.sheets, c.sheets.total);
   document.getElementById('sheetStackTotal').textContent = fmtMoney(c.sheets.total) + ' total';
@@ -1461,7 +1493,7 @@ function readEntryForm(){
     weightPerRoll:Number(b.weightPerRoll)||0,
     frontCostPerRoll:Number(b.frontCostPerRoll)||0, backCostPerRoll:Number(b.backCostPerRoll)||0,
     bagCostPerRoll:Number(b.bagCostPerRoll)||0,
-    glueKg:Number(b.glueKg)||0, glueAuto: b.glueAuto!==false, rollCount:Number(b.rollCount)||0,
+    glueKg:Number(b.glueKg)||0, glueRateUsed: (b.glueRateUsed!=null ? Number(b.glueRateUsed) : PRICING.glueRate), glueAuto: b.glueAuto!==false, rollCount:Number(b.rollCount)||0,
     outputKgOverride: (b.outputKgOverride!=null && b.outputKgOverride!=='') ? Number(b.outputKgOverride) : null
   }));
   return e;
@@ -1626,6 +1658,7 @@ async function deleteFromHistory(d){
 /* ---------------- settings ---------------- */
 function fillSettingsForm(){
   document.getElementById('set_elecRate').value = SETTINGS.elecRate;
+  document.getElementById('set_gbpRate').value = SETTINGS.gbpRate;
   document.getElementById('set_rent').value = SETTINGS.rent;
   document.getElementById('set_admin').value = SETTINGS.admin;
   document.getElementById('set_dep').value = SETTINGS.dep;
@@ -1634,7 +1667,8 @@ function fillSettingsForm(){
 }
 async function saveSettings(){
   SETTINGS = {
-    elecRate: num('set_elecRate'), rent: num('set_rent'), admin: num('set_admin'),
+    elecRate: num('set_elecRate'), gbpRate: num('set_gbpRate') || DEFAULT_SETTINGS.gbpRate,
+    rent: num('set_rent'), admin: num('set_admin'),
     dep: num('set_dep'), other: num('set_other'), prodDays: num('set_prodDays') || 26
   };
   const ok = await storageSet('settings', SETTINGS);
