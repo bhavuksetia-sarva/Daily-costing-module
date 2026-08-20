@@ -530,7 +530,7 @@
       <h2>Raw materials &amp; opening stock <span class="accent">&mdash; consumption is now costed by the weighted-average ledger, not a typed rate</span></h2>
       <div class="batch-tbl-wrap">
         <table class="batch-tbl">
-          <thead><tr><th>Material</th><th>Fallback rate ₹/kg</th><th>Opening stock (kg)</th><th>Opening stock rate ₹/kg</th><th>Reclaim material?</th><th></th></tr></thead>
+          <thead><tr><th>Material</th><th>Fallback rate ₹/kg</th><th>Opening stock (kg)</th><th>Opening stock rate ₹/kg</th><th></th></tr></thead>
           <tbody id="rawMaterialMasterBody"></tbody>
         </table>
       </div>
@@ -538,7 +538,7 @@
         <button class="btn btn-sm" onclick="addRawMaterial()">+ Add material</button>
         <button class="btn btn-primary" onclick="saveRawMaterialMaster()">Save materials</button>
       </div>
-      <div class="note-box">Opening stock sets the ledger's starting point — the quantity and average cost of each material already sitting in the yard before you started logging purchases here. Fallback rate is only used if a material is consumed with zero purchase history and no opening stock (so the ledger has nothing to base a weighted average on). Once purchases are logged in the Daily Log, the ledger takes over automatically — see the Inventory tab for current stock and cost.<br><br>Mark exactly one material as the <strong>reclaim material</strong> — the one that trim/wastage actually becomes once it's reprocessed (typically Rebonded Foam Chips). Daily Log's wastage entries are valued at that material's current ledger rate, credited back against that line's raw material cost, and added to that material's stock at the same rate — so reused trim isn't double-counted as a pure loss.</div>
+      <div class="note-box">Opening stock sets the ledger's starting point — the quantity and average cost of each material already sitting in the yard before you started logging purchases here. Fallback rate is only used if a material is consumed with zero purchase history and no opening stock (so the ledger has nothing to base a weighted average on). Once purchases are logged in the Daily Log, the ledger takes over automatically — see the Inventory tab for current stock and cost.<br><br>Trim/wastage entered in Daily Log is treated as reclaimed material: it's valued at the current ledger rate of whichever material is named "Rebonded" (matched automatically by name — keep that word in the material's name for this to work), credited back against that line's raw material cost, and added to that material's stock at the same rate — so reused trim isn't double-counted as a pure loss.</div>
       <div class="status-msg" id="rawMaterialStatus"></div>
     </div>
 
@@ -647,10 +647,10 @@ const SEED_MASTER_SKUS = [
 let MASTER_SKUS = SEED_MASTER_SKUS.map(s=>({...s}));
 
 const SEED_RAW_MATERIALS = [
-  {id:'rm1', name:'Local Foam Scrap', rate:40, openingQty:0, openingRate:null, isReclaimMaterial:false},
-  {id:'rm2', name:'Imported Foam Scrap', rate:35, openingQty:0, openingRate:null, isReclaimMaterial:false},
-  {id:'rm3', name:'Rebonded Foam Chips', rate:30, openingQty:0, openingRate:null, isReclaimMaterial:true},
-  {id:'rm4', name:'Binder / Adhesive (PU)', rate:200, openingQty:0, openingRate:null, isReclaimMaterial:false}
+  {id:'rm1', name:'Local Foam Scrap', rate:40, openingQty:0, openingRate:null},
+  {id:'rm2', name:'Imported Foam Scrap', rate:35, openingQty:0, openingRate:null},
+  {id:'rm3', name:'Rebonded Foam Chips', rate:30, openingQty:0, openingRate:null},
+  {id:'rm4', name:'Binder / Adhesive (PU)', rate:200, openingQty:0, openingRate:null}
 ];
 let RAW_MATERIAL_MASTER = SEED_RAW_MATERIALS.map(m=>({...m}));
 
@@ -888,7 +888,7 @@ function computeInventoryLedger(entriesMap, materialMaster){
     const openRate = (m.openingRate!=null && m.openingRate!=='') ? Number(m.openingRate) : Number(m.rate)||0;
     state[m.id] = { qty: openQty, avgCost: openRate };
   });
-  const reclaimMaterial = materialMaster.find(m=>m.isReclaimMaterial);
+  const reclaimMaterial = materialMaster.find(m=>/rebond/i.test(m.name||''));
   const ledgerByDate = {};
   dates.forEach(date=>{
     const e = entriesMap[date] || {};
@@ -1872,15 +1872,11 @@ function renderRawMaterialMasterTable(){
       <td><input type="number" min="0" step="any" value="${m.rate}" onchange="updateRawMaterialMaster('${m.id}','rate',this.value)"></td>
       <td><input type="number" min="0" step="any" value="${m.openingQty||''}" onchange="updateRawMaterialMaster('${m.id}','openingQty',this.value)"></td>
       <td><input type="number" min="0" step="any" value="${m.openingRate!=null?m.openingRate:''}" placeholder="= fallback" onchange="updateRawMaterialMaster('${m.id}','openingRate',this.value)"></td>
-      <td style="text-align:center;"><input type="radio" name="reclaimMaterialRadio" ${m.isReclaimMaterial?'checked':''} onchange="selectReclaimMaterial('${m.id}')"></td>
       <td><button class="batch-rm" onclick="removeRawMaterialMaster('${m.id}')">Remove</button></td>
     </tr>`).join('');
 }
-function selectReclaimMaterial(id){
-  RAW_MATERIAL_MASTER.forEach(m=>{ m.isReclaimMaterial = (m.id===id); });
-}
 function addRawMaterial(){
-  RAW_MATERIAL_MASTER.push({id:'rm_'+Date.now().toString(36), name:'New material', rate:0, openingQty:0, openingRate:null, isReclaimMaterial:false});
+  RAW_MATERIAL_MASTER.push({id:'rm_'+Date.now().toString(36), name:'New material', rate:0, openingQty:0, openingRate:null});
   renderRawMaterialMasterTable();
 }
 function removeRawMaterialMaster(id){
