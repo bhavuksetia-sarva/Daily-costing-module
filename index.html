@@ -214,7 +214,7 @@
           <p class="kpi-sub" id="kpiTotalOut">&mdash;</p>
         </div>
         <div class="kpi k-neutral">
-          <p class="kpi-label">Total Daily Cost</p>
+          <p class="kpi-label">Total Daily Cost <span style="color:var(--muted-dk);">(excl. raw material)</span></p>
           <div class="kpi-val" id="kpiTotalCost">&mdash;</div>
           <p class="kpi-sub" id="kpiWastage">&mdash;</p>
         </div>
@@ -230,6 +230,19 @@
           <p class="kpi-label">Underlay &middot; Conversion Cost / kg</p>
           <div class="kpi-val" id="kpiUnderlayConversion">&mdash;</div>
           <p class="kpi-sub">Labor + electricity + overhead, excl. raw material &amp; lamination</p>
+        </div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi k-amber">
+          <p class="kpi-label">Sheets &middot; Efficiency</p>
+          <div class="kpi-val" id="kpiSheetEfficiency">&mdash;</div>
+          <p class="kpi-sub">1 &minus; (wastage kg &divide; output kg) — higher is better</p>
+        </div>
+        <div class="kpi k-steel">
+          <p class="kpi-label">Underlay &middot; Efficiency</p>
+          <div class="kpi-val" id="kpiUnderlayEfficiency">&mdash;</div>
+          <p class="kpi-sub">1 &minus; (wastage kg &divide; output kg) — higher is better</p>
         </div>
       </div>
 
@@ -356,7 +369,7 @@
         <div class="field-grid">
           <div class="field"><label>Cutting stage labor <span class="unit">(headcount)</span></label><input type="number" id="sh_laborCount" min="0" step="1"></div>
           <div class="field"><label>Cutting stage electricity <span class="unit">(kWh)</span></label><input type="number" id="sh_elecUnits" min="0" step="any"></div>
-          <div class="field"><label>Trim wastage, all SKUs <span class="unit">(kg)</span></label><input type="number" id="sh_wastageKg" min="0" step="any"></div>
+          <div class="field"><label>Trim wastage, all SKUs <span class="unit">(kg, reclaimed as raw material)</span></label><input type="number" id="sh_wastageKg" min="0" step="any"></div>
         </div>
         <div class="hairline"></div>
         <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">Raw materials used &mdash; sheet blocks</p>
@@ -391,7 +404,7 @@
           <div class="field"><label>Peeling electricity <span class="unit">(kWh)</span></label><input type="number" id="u_peelElecUnits" min="0" step="any"></div>
           <div class="field"><label>Lamination + packing labor <span class="unit">(headcount)</span></label><input type="number" id="u_lamLaborCount" min="0" step="1"></div>
           <div class="field"><label>Lamination electricity <span class="unit">(kWh)</span></label><input type="number" id="u_lamElecUnits" min="0" step="any"></div>
-          <div class="field"><label>Wastage, all SKUs <span class="unit">(kg)</span></label><input type="number" id="u_wastageKg" min="0" step="any"></div>
+          <div class="field"><label>Wastage, all SKUs <span class="unit">(kg, reclaimed as raw material)</span></label><input type="number" id="u_wastageKg" min="0" step="any"></div>
           <div class="field"><label>Total glue used <span class="unit">(kg, all SKUs)</span></label><input type="number" id="u_totalGlueKg" min="0" step="any"></div>
         </div>
         <div class="hairline"></div>
@@ -437,7 +450,7 @@
           <thead>
             <tr>
               <th>Date</th><th>Sheet SKUs</th><th>Sheets out (kg)</th><th>Sheets avg ₹/kg</th>
-              <th>Roll SKUs</th><th>Underlay out (kg)</th><th>Underlay avg ₹/kg</th><th>Total cost (₹)</th><th></th>
+              <th>Roll SKUs</th><th>Underlay out (kg)</th><th>Underlay avg ₹/kg</th><th>Total cost excl. raw (₹)</th><th></th>
             </tr>
           </thead>
           <tbody id="historyBody"></tbody>
@@ -517,7 +530,7 @@
       <h2>Raw materials &amp; opening stock <span class="accent">&mdash; consumption is now costed by the weighted-average ledger, not a typed rate</span></h2>
       <div class="batch-tbl-wrap">
         <table class="batch-tbl">
-          <thead><tr><th>Material</th><th>Fallback rate ₹/kg</th><th>Opening stock (kg)</th><th>Opening stock rate ₹/kg</th><th></th></tr></thead>
+          <thead><tr><th>Material</th><th>Fallback rate ₹/kg</th><th>Opening stock (kg)</th><th>Opening stock rate ₹/kg</th><th>Reclaim material?</th><th></th></tr></thead>
           <tbody id="rawMaterialMasterBody"></tbody>
         </table>
       </div>
@@ -525,7 +538,7 @@
         <button class="btn btn-sm" onclick="addRawMaterial()">+ Add material</button>
         <button class="btn btn-primary" onclick="saveRawMaterialMaster()">Save materials</button>
       </div>
-      <div class="note-box">Opening stock sets the ledger's starting point — the quantity and average cost of each material already sitting in the yard before you started logging purchases here. Fallback rate is only used if a material is consumed with zero purchase history and no opening stock (so the ledger has nothing to base a weighted average on). Once purchases are logged in the Daily Log, the ledger takes over automatically — see the Inventory tab for current stock and cost.</div>
+      <div class="note-box">Opening stock sets the ledger's starting point — the quantity and average cost of each material already sitting in the yard before you started logging purchases here. Fallback rate is only used if a material is consumed with zero purchase history and no opening stock (so the ledger has nothing to base a weighted average on). Once purchases are logged in the Daily Log, the ledger takes over automatically — see the Inventory tab for current stock and cost.<br><br>Mark exactly one material as the <strong>reclaim material</strong> — the one that trim/wastage actually becomes once it's reprocessed (typically Rebonded Foam Chips). Daily Log's wastage entries are valued at that material's current ledger rate, credited back against that line's raw material cost, and added to that material's stock at the same rate — so reused trim isn't double-counted as a pure loss.</div>
       <div class="status-msg" id="rawMaterialStatus"></div>
     </div>
 
@@ -634,10 +647,10 @@ const SEED_MASTER_SKUS = [
 let MASTER_SKUS = SEED_MASTER_SKUS.map(s=>({...s}));
 
 const SEED_RAW_MATERIALS = [
-  {id:'rm1', name:'Local Foam Scrap', rate:40, openingQty:0, openingRate:null},
-  {id:'rm2', name:'Imported Foam Scrap', rate:35, openingQty:0, openingRate:null},
-  {id:'rm3', name:'Rebonded Foam Chips', rate:30, openingQty:0, openingRate:null},
-  {id:'rm4', name:'Binder / Adhesive (PU)', rate:200, openingQty:0, openingRate:null}
+  {id:'rm1', name:'Local Foam Scrap', rate:40, openingQty:0, openingRate:null, isReclaimMaterial:false},
+  {id:'rm2', name:'Imported Foam Scrap', rate:35, openingQty:0, openingRate:null, isReclaimMaterial:false},
+  {id:'rm3', name:'Rebonded Foam Chips', rate:30, openingQty:0, openingRate:null, isReclaimMaterial:true},
+  {id:'rm4', name:'Binder / Adhesive (PU)', rate:200, openingQty:0, openingRate:null, isReclaimMaterial:false}
 ];
 let RAW_MATERIAL_MASTER = SEED_RAW_MATERIALS.map(m=>({...m}));
 
@@ -875,6 +888,7 @@ function computeInventoryLedger(entriesMap, materialMaster){
     const openRate = (m.openingRate!=null && m.openingRate!=='') ? Number(m.openingRate) : Number(m.rate)||0;
     state[m.id] = { qty: openQty, avgCost: openRate };
   });
+  const reclaimMaterial = materialMaster.find(m=>m.isReclaimMaterial);
   const ledgerByDate = {};
   dates.forEach(date=>{
     const e = entriesMap[date] || {};
@@ -890,6 +904,19 @@ function computeInventoryLedger(entriesMap, materialMaster){
       const newAvg = newQty>0 ? ((cur.qty*cur.avgCost)+(qty*pRate))/newQty : pRate;
       state[p.materialId] = { qty:newQty, avgCost:newAvg };
     });
+    // 1b) trim/wastage reclaimed as raw material — added to the reclaim material's stock at
+    // its own current average cost, so this inflow never moves the average, only the quantity.
+    let reclaimRate = null;
+    if(reclaimMaterial){
+      const cur = state[reclaimMaterial.id] || {qty:0, avgCost:(reclaimMaterial.rate||0)};
+      reclaimRate = cur.avgCost;
+      const totalWastageQty = (Number(e.sh_wastageKg)||0) + (Number(e.u_wastageKg)||0);
+      if(totalWastageQty > 0){
+        const newQty = cur.qty + totalWastageQty;
+        const newAvg = newQty>0 ? ((cur.qty*cur.avgCost)+(totalWastageQty*reclaimRate))/newQty : reclaimRate;
+        state[reclaimMaterial.id] = { qty:newQty, avgCost:newAvg };
+      }
+    }
     // 2) consumption (both lines draw from the same physical stock) is charged at today's avg cost
     const consumedByMaterial = {};
     (e.sh_rawMaterials||[]).forEach(m=>{ if(m.materialId) consumedByMaterial[m.materialId] = (consumedByMaterial[m.materialId]||0) + (Number(m.qtyKg)||0); });
@@ -903,13 +930,14 @@ function computeInventoryLedger(entriesMap, materialMaster){
       state[materialId] = { qty: cur.qty - consumedQty, avgCost: cur.avgCost };
       perMaterial[materialId] = { avgCostToCharge, consumedQty, warning, qtyOnHandAfter: state[materialId].qty };
     });
-    ledgerByDate[date] = { perMaterial };
+    ledgerByDate[date] = { perMaterial, reclaimRate };
   });
   return { ledgerByDate, finalState: state, lastDate: dates.length ? dates[dates.length-1] : null };
 }
 
-function computeDay(e, settings, materialRates){
+function computeDay(e, settings, materialRates, reclaimRate){
   materialRates = materialRates || {};
+  reclaimRate = reclaimRate || 0;
   const rate = settings.elecRate;
   const sharedLabor = (e.s_laborCount||0) * (settings.laborRateFoaming||0);
   const sharedElec = e.s_elecUnits*rate;
@@ -927,12 +955,14 @@ function computeDay(e, settings, materialRates){
     return {...m, qtyKg:Number(m.qtyKg)||0, rate: resolved ? resolved.avgCostToCharge : fallback, ledgerWarning: resolved ? resolved.warning : false, noLedger: !resolved};
   });
   const sheetRawCost = sheetRawMaterials.reduce((s,m)=>s+m.qtyKg*m.rate,0);
+  const sheetWastageCredit = (Number(e.sh_wastageKg)||0) * reclaimRate;
+  const sheetRawNet = sheetRawCost - sheetWastageCredit;
 
   const sheetBatches = (e.sh_batches||[]).map(b=>({...b, outputKg: Number(b.outputKg)||0}));
   const totalSheetOut = sheetBatches.reduce((s,b)=>s+b.outputKg,0);
 
   const sheetsPool = {
-    raw: sheetRawCost,
+    raw: sheetRawNet,
     labor: sharedLabor*sheetRatio + (e.sh_laborCount||0)*(settings.laborRateCutting||0),
     elec: sharedElec*sheetRatio + e.sh_elecUnits*rate,
     other: sharedOther*sheetRatio,
@@ -953,12 +983,13 @@ function computeDay(e, settings, materialRates){
     raw: sheetsPool.raw, labor: sheetsPool.labor, elec: sheetsPool.elec, consum:0,
     other: sheetsPool.other, oh: sheetsPool.oh,
     outputKg: totalSheetOut, wastageKg: e.sh_wastageKg, batches: sheetBatches, ratePerKg: sheetsRatePerKg,
-    rawMaterials: sheetRawMaterials
+    rawMaterials: sheetRawMaterials, wastageCredit: sheetWastageCredit
   };
   sheets.total = sheetsPoolTotal;
   sheets.perKg = totalSheetOut>0 ? sheets.total/totalSheetOut : 0;
   sheets.conversionCost = sheets.labor+sheets.elec+sheets.other+sheets.oh; // total minus raw material — the value added by processing
   sheets.conversionPerKg = totalSheetOut>0 ? sheets.conversionCost/totalSheetOut : 0;
+  sheets.efficiencyPct = totalSheetOut>0 ? (1 - (e.sh_wastageKg||0)/totalSheetOut)*100 : 0;
 
   const underlayRawMaterials = (e.u_rawMaterials||[]).map(m=>{
     const resolved = materialRates[m.materialId];
@@ -966,6 +997,8 @@ function computeDay(e, settings, materialRates){
     return {...m, qtyKg:Number(m.qtyKg)||0, rate: resolved ? resolved.avgCostToCharge : fallback, ledgerWarning: resolved ? resolved.warning : false, noLedger: !resolved};
   });
   const underlayRawCost = underlayRawMaterials.reduce((s,m)=>s+m.qtyKg*m.rate,0);
+  const underlayWastageCredit = (Number(e.u_wastageKg)||0) * reclaimRate;
+  const underlayRawNet = underlayRawCost - underlayWastageCredit;
 
   const underlayBatches = (e.u_batches||[]).map(b=>({...b,
     rollCount: Number(b.rollCount)||0,
@@ -981,7 +1014,7 @@ function computeDay(e, settings, materialRates){
   const totalRolls = underlayBatches.reduce((s,b)=>s+b.rollCount,0);
 
   const underlayPool = {
-    raw: underlayRawCost,
+    raw: underlayRawNet,
     labor: sharedLabor*underlayRatio + (e.u_peelLaborCount||0)*(settings.laborRatePeeling||0) + (e.u_lamLaborCount||0)*(settings.laborRateLamination||0),
     elec: sharedElec*underlayRatio + e.u_peelElecUnits*rate + e.u_lamElecUnits*rate,
     other: sharedOther*underlayRatio,
@@ -1007,19 +1040,21 @@ function computeDay(e, settings, materialRates){
     raw: underlayPool.raw, labor: underlayPool.labor, elec: underlayPool.elec, consum: consumTotal,
     other: underlayPool.other, oh: underlayPool.oh,
     outputKg: totalUnderlayOut, wastageKg: e.u_wastageKg, rollCount: totalRolls,
-    batches: underlayBatches, ratePerKg: underlayRatePerKg, rawMaterials: underlayRawMaterials
+    batches: underlayBatches, ratePerKg: underlayRatePerKg, rawMaterials: underlayRawMaterials, wastageCredit: underlayWastageCredit
   };
   underlay.total = underlayPoolTotal + consumTotal;
   underlay.perKg = totalUnderlayOut>0 ? underlay.total/totalUnderlayOut : 0;
   underlay.perRoll = totalRolls>0 ? underlay.total/totalRolls : 0;
   underlay.conversionCost = underlay.labor+underlay.elec+underlay.other+underlay.oh; // total minus raw material and lamination consumables
   underlay.conversionPerKg = totalUnderlayOut>0 ? underlay.conversionCost/totalUnderlayOut : 0;
+  underlay.efficiencyPct = totalUnderlayOut>0 ? (1 - (e.u_wastageKg||0)/totalUnderlayOut)*100 : 0;
 
   const totalCost = sheets.total+underlay.total;
   const totalOut = sheets.outputKg+underlay.outputKg;
   const blended = totalOut>0 ? totalCost/totalOut : 0;
+  const totalCostExclRaw = totalCost - sheets.raw - underlay.raw;
 
-  return { sheets, underlay, totalCost, totalOut, blended, dailyOverhead };
+  return { sheets, underlay, totalCost, totalCostExclRaw, totalOut, blended, dailyOverhead };
 }
 
 function blankEntry(date){
@@ -1393,7 +1428,7 @@ function renderDashboard(){
   const entry = ENTRIES[d];
   if(!entry) return;
   const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
-  const c = computeDay(entry, SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{});
+  const c = computeDay(entry, SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{}, (ledger.ledgerByDate[d]||{}).reclaimRate);
 
   document.getElementById('skuDateLabel').textContent = d;
 
@@ -1403,10 +1438,12 @@ function renderDashboard(){
   document.getElementById('kpiUnderlayOut').innerHTML = fmtKg(c.underlay.outputKg) + ' produced &middot; ' + (c.underlay.rollCount||0) + ' rolls, ' + c.underlay.batches.length + ' SKUs';
   document.getElementById('kpiBlended').innerHTML = fmtMoney(c.blended) + '<small>/kg</small>';
   document.getElementById('kpiTotalOut').textContent = fmtKg(c.totalOut) + ' total output';
-  document.getElementById('kpiTotalCost').textContent = fmtMoney(c.totalCost);
+  document.getElementById('kpiTotalCost').textContent = fmtMoney(c.totalCostExclRaw);
   document.getElementById('kpiWastage').textContent = 'Wastage: ' + fmtKg(c.sheets.wastageKg + c.underlay.wastageKg);
   document.getElementById('kpiSheetConversion').innerHTML = fmtMoney(c.sheets.conversionPerKg) + '<small>/kg</small>';
   document.getElementById('kpiUnderlayConversion').innerHTML = fmtMoney(c.underlay.conversionPerKg) + '<small>/kg</small>';
+  document.getElementById('kpiSheetEfficiency').innerHTML = c.sheets.efficiencyPct.toFixed(2) + '<small>%</small>';
+  document.getElementById('kpiUnderlayEfficiency').innerHTML = c.underlay.efficiencyPct.toFixed(2) + '<small>%</small>';
 
   renderSkuTable(c, entry.gbpRateUsed || SETTINGS.gbpRate);
 
@@ -1505,7 +1542,7 @@ function renderTrendCharts(){
   const sheetVals = [], underlayVals = [], sheetOut = [], underlayOut = [];
   const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
   dates.forEach(d=>{
-    const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{});
+    const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{}, (ledger.ledgerByDate[d]||{}).reclaimRate);
     sheetVals.push(Number(c.sheets.perKg.toFixed(2)));
     underlayVals.push(Number(c.underlay.perKg.toFixed(2)));
     sheetOut.push(Number(c.sheets.outputKg.toFixed(1)));
@@ -1572,11 +1609,11 @@ function currentEditingLedgerRates(){
   const date = e.date || todayStr();
   const tempEntries = {...ENTRIES, [date]: e};
   const ledger = computeInventoryLedger(tempEntries, RAW_MATERIAL_MASTER);
-  return { date, materialRates: (ledger.ledgerByDate[date]||{}).perMaterial || {}, entry: e };
+  return { date, materialRates: (ledger.ledgerByDate[date]||{}).perMaterial || {}, reclaimRate: (ledger.ledgerByDate[date]||{}).reclaimRate, entry: e };
 }
 function updateLivePreview(){
-  const { entry:e, materialRates } = currentEditingLedgerRates();
-  const c = computeDay(e, SETTINGS, materialRates);
+  const { entry:e, materialRates, reclaimRate } = currentEditingLedgerRates();
+  const c = computeDay(e, SETTINGS, materialRates, reclaimRate);
   document.getElementById('livePreview').innerHTML = `
     <div class="preview-item"><span class="l">Sheets avg ₹/kg</span><span class="v amber">${fmtMoney(c.sheets.perKg)}</span></div>
     <div class="preview-item"><span class="l">Underlay avg ₹/kg</span><span class="v steel">${fmtMoney(c.underlay.perKg)}</span></div>
@@ -1643,7 +1680,7 @@ function renderHistory(){
   document.getElementById('historyEmpty').style.display='none';
   const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
   body.innerHTML = dates.map(d=>{
-    const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{});
+    const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{}, (ledger.ledgerByDate[d]||{}).reclaimRate);
     return `<tr>
       <td>${d}</td>
       <td>${c.sheets.batches.length}</td>
@@ -1652,7 +1689,7 @@ function renderHistory(){
       <td>${c.underlay.batches.length}</td>
       <td>${fmtKg(c.underlay.outputKg)}</td>
       <td>${fmtMoney(c.underlay.perKg)}</td>
-      <td>${fmtMoney(c.totalCost)}</td>
+      <td>${fmtMoney(c.totalCostExclRaw)}</td>
       <td>
         <button class="link-btn" onclick="editFromHistory('${d}')">Edit</button>
         <button class="link-btn del" onclick="deleteFromHistory('${d}')">Delete</button>
@@ -1835,11 +1872,15 @@ function renderRawMaterialMasterTable(){
       <td><input type="number" min="0" step="any" value="${m.rate}" onchange="updateRawMaterialMaster('${m.id}','rate',this.value)"></td>
       <td><input type="number" min="0" step="any" value="${m.openingQty||''}" onchange="updateRawMaterialMaster('${m.id}','openingQty',this.value)"></td>
       <td><input type="number" min="0" step="any" value="${m.openingRate!=null?m.openingRate:''}" placeholder="= fallback" onchange="updateRawMaterialMaster('${m.id}','openingRate',this.value)"></td>
+      <td style="text-align:center;"><input type="radio" name="reclaimMaterialRadio" ${m.isReclaimMaterial?'checked':''} onchange="selectReclaimMaterial('${m.id}')"></td>
       <td><button class="batch-rm" onclick="removeRawMaterialMaster('${m.id}')">Remove</button></td>
     </tr>`).join('');
 }
+function selectReclaimMaterial(id){
+  RAW_MATERIAL_MASTER.forEach(m=>{ m.isReclaimMaterial = (m.id===id); });
+}
 function addRawMaterial(){
-  RAW_MATERIAL_MASTER.push({id:'rm_'+Date.now().toString(36), name:'New material', rate:0, openingQty:0, openingRate:null});
+  RAW_MATERIAL_MASTER.push({id:'rm_'+Date.now().toString(36), name:'New material', rate:0, openingQty:0, openingRate:null, isReclaimMaterial:false});
   renderRawMaterialMasterTable();
 }
 function removeRawMaterialMaster(id){
