@@ -179,6 +179,7 @@
       <button data-tab="dashboard" class="active">Dashboard</button>
       <button data-tab="entry">Daily Log</button>
       <button data-tab="history">History</button>
+      <button data-tab="reports">Reports</button>
       <button data-tab="inventory">Inventory</button>
       <button data-tab="settings">Settings</button>
     </nav>
@@ -234,12 +235,12 @@
         <div class="kpi k-amber">
           <p class="kpi-label">Sheets &middot; Efficiency</p>
           <div class="kpi-val" id="kpiSheetEfficiency">&mdash;</div>
-          <p class="kpi-sub">1 &minus; (wastage kg &divide; output kg)</p>
+          <p class="kpi-sub">1 &minus; (wastage kg &divide; raw material input kg) — higher is better</p>
         </div>
         <div class="kpi k-steel">
           <p class="kpi-label">Underlay &middot; Efficiency</p>
           <div class="kpi-val" id="kpiUnderlayEfficiency">&mdash;</div>
-          <p class="kpi-sub">1 &minus; (wastage kg &divide; output kg)</p>
+          <p class="kpi-sub">1 &minus; (wastage kg &divide; raw material input kg) — higher is better</p>
         </div>
       </div>
 
@@ -454,6 +455,104 @@
         </table>
       </div>
       <div id="historyEmpty" class="empty-state" style="display:none;">No entries yet.</div>
+    </div>
+  </section>
+
+  <!-- ============ REPORTS ============ -->
+  <section class="view" id="view-reports">
+    <div class="panel">
+      <div class="date-picker-row" style="margin-bottom:0;flex-wrap:wrap;">
+        <label for="reportPreset">Period</label>
+        <select id="reportPreset" onchange="applyReportPreset()">
+          <option value="last7">Last 7 days</option>
+          <option value="this_week">This week</option>
+          <option value="last_week">Last week</option>
+          <option value="last30">Last 30 days</option>
+          <option value="this_month">This month</option>
+          <option value="last_month">Last month</option>
+          <option value="custom">Custom range</option>
+        </select>
+        <label for="reportFrom" style="margin-left:8px;">From</label>
+        <input type="date" id="reportFrom" onchange="document.getElementById('reportPreset').value='custom'; renderReports();">
+        <label for="reportTo">To</label>
+        <input type="date" id="reportTo" onchange="document.getElementById('reportPreset').value='custom'; renderReports();">
+        <span id="reportRangeLabel" style="font-family:var(--f-mono);font-size:11px;color:var(--muted-dk);margin-left:8px;"></span>
+      </div>
+    </div>
+
+    <div id="reportEmpty" class="empty-state" style="display:none;">No entries logged in this date range.</div>
+
+    <div id="reportContent" style="display:none;">
+      <div class="kpi-row">
+        <div class="kpi k-amber">
+          <p class="kpi-label">Sheets &middot; Avg Cost / kg</p>
+          <div class="kpi-val" id="repSheetCost">&mdash;</div>
+          <p class="kpi-sub" id="repSheetOut">&mdash;</p>
+        </div>
+        <div class="kpi k-steel">
+          <p class="kpi-label">Underlay &middot; Avg Cost / kg</p>
+          <div class="kpi-val" id="repUnderlayCost">&mdash;</div>
+          <p class="kpi-sub" id="repUnderlayOut">&mdash;</p>
+        </div>
+        <div class="kpi k-neutral">
+          <p class="kpi-label">Blended Cost / kg</p>
+          <div class="kpi-val" id="repBlended">&mdash;</div>
+          <p class="kpi-sub" id="repTotalOut">&mdash;</p>
+        </div>
+        <div class="kpi k-neutral">
+          <p class="kpi-label">Total Cost <span style="color:var(--muted-dk);">(excl. raw material)</span></p>
+          <div class="kpi-val" id="repTotalCost">&mdash;</div>
+          <p class="kpi-sub" id="repDaysLogged">&mdash;</p>
+        </div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi k-amber">
+          <p class="kpi-label">Sheets &middot; Conversion Cost / kg</p>
+          <div class="kpi-val" id="repSheetConversion">&mdash;</div>
+          <p class="kpi-sub">Labor + electricity + overhead, excl. raw material</p>
+        </div>
+        <div class="kpi k-steel">
+          <p class="kpi-label">Underlay &middot; Conversion Cost / kg</p>
+          <div class="kpi-val" id="repUnderlayConversion">&mdash;</div>
+          <p class="kpi-sub">Labor + electricity + overhead, excl. raw material &amp; lamination</p>
+        </div>
+        <div class="kpi k-amber">
+          <p class="kpi-label">Sheets &middot; Efficiency</p>
+          <div class="kpi-val" id="repSheetEfficiency">&mdash;</div>
+          <p class="kpi-sub">1 &minus; (wastage kg &divide; raw material input kg)</p>
+        </div>
+        <div class="kpi k-steel">
+          <p class="kpi-label">Underlay &middot; Efficiency</p>
+          <div class="kpi-val" id="repUnderlayEfficiency">&mdash;</div>
+          <p class="kpi-sub">1 &minus; (wastage kg &divide; raw material input kg)</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Cost composition &mdash; <span class="accent">totals for this period</span></h2>
+        <div class="tbl-wrap">
+          <table id="reportCompositionTable">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th class="col-amber">Sheets ₹</th><th class="col-amber">Sheets ₹/kg</th><th class="col-amber">Sheets %</th>
+                <th class="col-steel">Underlay ₹</th><th class="col-steel">Underlay ₹/kg</th><th class="col-steel">Underlay %</th>
+              </tr>
+            </thead>
+            <tbody id="reportCompositionBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Cost / kg trend <span class="accent">&mdash; each logged day in this period</span></h2>
+        <div class="chart-wrap" id="reportTrendChart"></div>
+      </div>
+      <div class="panel">
+        <h2>Output <span class="accent">&mdash; each logged day in this period</span></h2>
+        <div class="chart-wrap" id="reportOutputChart"></div>
+      </div>
     </div>
   </section>
 
@@ -952,6 +1051,7 @@ function computeDay(e, settings, materialRates, reclaimRate){
     return {...m, qtyKg:Number(m.qtyKg)||0, rate: resolved ? resolved.avgCostToCharge : fallback, ledgerWarning: resolved ? resolved.warning : false, noLedger: !resolved};
   });
   const sheetRawCost = sheetRawMaterials.reduce((s,m)=>s+m.qtyKg*m.rate,0);
+  const sheetRawInputKg = sheetRawMaterials.reduce((s,m)=>s+m.qtyKg,0);
   const sheetWastageCredit = (Number(e.sh_wastageKg)||0) * reclaimRate;
   const sheetRawNet = sheetRawCost - sheetWastageCredit;
 
@@ -986,7 +1086,8 @@ function computeDay(e, settings, materialRates, reclaimRate){
   sheets.perKg = totalSheetOut>0 ? sheets.total/totalSheetOut : 0;
   sheets.conversionCost = sheets.labor+sheets.elec+sheets.other+sheets.oh; // total minus raw material — the value added by processing
   sheets.conversionPerKg = totalSheetOut>0 ? sheets.conversionCost/totalSheetOut : 0;
-  sheets.efficiencyPct = totalSheetOut>0 ? (1 - (e.sh_wastageKg||0)/totalSheetOut)*100 : 0;
+  sheets.efficiencyPct = sheetRawInputKg>0 ? (1 - (e.sh_wastageKg||0)/sheetRawInputKg)*100 : 0;
+  sheets.rawInputKg = sheetRawInputKg;
 
   const underlayRawMaterials = (e.u_rawMaterials||[]).map(m=>{
     const resolved = materialRates[m.materialId];
@@ -994,6 +1095,7 @@ function computeDay(e, settings, materialRates, reclaimRate){
     return {...m, qtyKg:Number(m.qtyKg)||0, rate: resolved ? resolved.avgCostToCharge : fallback, ledgerWarning: resolved ? resolved.warning : false, noLedger: !resolved};
   });
   const underlayRawCost = underlayRawMaterials.reduce((s,m)=>s+m.qtyKg*m.rate,0);
+  const underlayRawInputKg = underlayRawMaterials.reduce((s,m)=>s+m.qtyKg,0);
   const underlayWastageCredit = (Number(e.u_wastageKg)||0) * reclaimRate;
   const underlayRawNet = underlayRawCost - underlayWastageCredit;
 
@@ -1044,7 +1146,8 @@ function computeDay(e, settings, materialRates, reclaimRate){
   underlay.perRoll = totalRolls>0 ? underlay.total/totalRolls : 0;
   underlay.conversionCost = underlay.labor+underlay.elec+underlay.other+underlay.oh; // total minus raw material and lamination consumables
   underlay.conversionPerKg = totalUnderlayOut>0 ? underlay.conversionCost/totalUnderlayOut : 0;
-  underlay.efficiencyPct = totalUnderlayOut>0 ? (1 - (e.u_wastageKg||0)/totalUnderlayOut)*100 : 0;
+  underlay.efficiencyPct = underlayRawInputKg>0 ? (1 - (e.u_wastageKg||0)/underlayRawInputKg)*100 : 0;
+  underlay.rawInputKg = underlayRawInputKg;
 
   const totalCost = sheets.total+underlay.total;
   const totalOut = sheets.outputKg+underlay.outputKg;
@@ -1079,6 +1182,7 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
     btn.classList.add('active');
     document.getElementById('view-'+btn.dataset.tab).classList.add('active');
     if(btn.dataset.tab==='history') renderHistory();
+    if(btn.dataset.tab==='reports') renderReports();
     if(btn.dataset.tab==='inventory') renderInventory();
     if(btn.dataset.tab==='dashboard') renderDashboard();
   });
@@ -1357,7 +1461,7 @@ function compositionTooltip(catObj, total){
   }).join('\n');
 }
 
-function renderCompositionTable(c){
+function renderCompositionTableInto(bodyId, c){
   const labels = [['raw','Raw Material'],['labor','Labor'],['elec','Electricity'],['consum','Consumables (lamination)'],['other','Other Direct'],['oh','Overhead']];
   const sTotal = c.sheets.total, uTotal = c.underlay.total;
   const sOut = c.sheets.outputKg, uOut = c.underlay.outputKg;
@@ -1381,7 +1485,10 @@ function renderCompositionTable(c){
     <td class="num">${fmtMoney(sTotal)}</td><td class="num">${perKg(sTotal,sOut)}</td><td class="num">100%</td>
     <td class="num">${fmtMoney(uTotal)}</td><td class="num">${perKg(uTotal,uOut)}</td><td class="num">100%</td>
   </tr>`;
-  document.getElementById('compositionTableBody').innerHTML = (rows||'<tr><td colspan="7" class="batch-empty">No cost recorded for this date.</td></tr>') + (sTotal>0||uTotal>0 ? totalRow : '');
+  document.getElementById(bodyId).innerHTML = (rows||'<tr><td colspan="7" class="batch-empty">No cost recorded.</td></tr>') + (sTotal>0||uTotal>0 ? totalRow : '');
+}
+function renderCompositionTable(c){
+  renderCompositionTableInto('compositionTableBody', c);
 }
 
 function renderSkuTable(c, gbpRate){
@@ -1743,6 +1850,117 @@ function renderInventory(){
   }
 }
 
+/* ---------------- reports (date-range aggregation) ---------------- */
+function toISODate(d){ return d.toISOString().slice(0,10); }
+function addDays(dateStr, n){ const d = new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return toISODate(d); }
+function getPresetRange(preset){
+  const today = new Date();
+  const todayStr = toISODate(today);
+  const dow = today.getDay(); // 0=Sun..6=Sat
+  const mondayOffset = dow===0 ? -6 : 1-dow; // days to subtract to reach this week's Monday
+  const thisMonday = addDays(todayStr, mondayOffset);
+  switch(preset){
+    case 'last7': return { from: addDays(todayStr, -6), to: todayStr };
+    case 'last30': return { from: addDays(todayStr, -29), to: todayStr };
+    case 'this_week': return { from: thisMonday, to: todayStr };
+    case 'last_week': { const lastMon = addDays(thisMonday, -7); return { from: lastMon, to: addDays(lastMon, 6) }; }
+    case 'this_month': { const y=today.getFullYear(), m=today.getMonth(); return { from: toISODate(new Date(y,m,1)), to: todayStr }; }
+    case 'last_month': { const y=today.getFullYear(), m=today.getMonth(); const lm = new Date(y,m-1,1); return { from: toISODate(lm), to: toISODate(new Date(y,m,0)) }; }
+    default: return null;
+  }
+}
+function applyReportPreset(){
+  const preset = document.getElementById('reportPreset').value;
+  if(preset==='custom') { renderReports(); return; }
+  const range = getPresetRange(preset);
+  if(range){
+    document.getElementById('reportFrom').value = range.from;
+    document.getElementById('reportTo').value = range.to;
+  }
+  renderReports();
+}
+function renderReports(){
+  const from = document.getElementById('reportFrom').value;
+  const to = document.getElementById('reportTo').value;
+  if(!from || !to){ return; }
+  document.getElementById('reportRangeLabel').textContent = from + ' → ' + to;
+
+  const dates = Object.keys(ENTRIES).filter(d => d>=from && d<=to).sort();
+  if(dates.length===0){
+    document.getElementById('reportEmpty').style.display='block';
+    document.getElementById('reportContent').style.display='none';
+    return;
+  }
+  document.getElementById('reportEmpty').style.display='none';
+  document.getElementById('reportContent').style.display='block';
+
+  const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
+  const cats = ['raw','labor','elec','consum','other','oh'];
+  const agg = {
+    sheets: {outputKg:0, wastageKg:0, total:0, conversionCost:0, batches:0, rawInputKg:0},
+    underlay: {outputKg:0, wastageKg:0, total:0, conversionCost:0, batches:0, rollCount:0, rawInputKg:0},
+    totalCost:0, totalCostExclRaw:0
+  };
+  cats.forEach(k=>{ agg.sheets[k]=0; agg.underlay[k]=0; });
+
+  dates.forEach(d=>{
+    const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{}, (ledger.ledgerByDate[d]||{}).reclaimRate);
+    cats.forEach(k=>{ agg.sheets[k]+=c.sheets[k]||0; agg.underlay[k]+=c.underlay[k]||0; });
+    agg.sheets.outputKg += c.sheets.outputKg; agg.sheets.wastageKg += c.sheets.wastageKg||0;
+    agg.sheets.total += c.sheets.total; agg.sheets.conversionCost += c.sheets.conversionCost;
+    agg.sheets.batches += c.sheets.batches.length; agg.sheets.rawInputKg += c.sheets.rawInputKg||0;
+    agg.underlay.outputKg += c.underlay.outputKg; agg.underlay.wastageKg += c.underlay.wastageKg||0;
+    agg.underlay.total += c.underlay.total; agg.underlay.conversionCost += c.underlay.conversionCost;
+    agg.underlay.batches += c.underlay.batches.length; agg.underlay.rollCount += c.underlay.rollCount||0;
+    agg.underlay.rawInputKg += c.underlay.rawInputKg||0;
+    agg.totalCost += c.totalCost; agg.totalCostExclRaw += c.totalCostExclRaw;
+  });
+
+  const sOut = agg.sheets.outputKg, uOut = agg.underlay.outputKg, tOut = sOut+uOut;
+  const sPerKg = sOut>0 ? agg.sheets.total/sOut : 0;
+  const uPerKg = uOut>0 ? agg.underlay.total/uOut : 0;
+  const blended = tOut>0 ? (agg.sheets.total+agg.underlay.total)/tOut : 0;
+  const sConvPerKg = sOut>0 ? agg.sheets.conversionCost/sOut : 0;
+  const uConvPerKg = uOut>0 ? agg.underlay.conversionCost/uOut : 0;
+  const sEff = agg.sheets.rawInputKg>0 ? (1 - agg.sheets.wastageKg/agg.sheets.rawInputKg)*100 : 0;
+  const uEff = agg.underlay.rawInputKg>0 ? (1 - agg.underlay.wastageKg/agg.underlay.rawInputKg)*100 : 0;
+
+  document.getElementById('repSheetCost').innerHTML = fmtMoney(sPerKg) + '<small>/kg</small>';
+  document.getElementById('repSheetOut').textContent = fmtKg(sOut) + ' produced &middot; ' + agg.sheets.batches + ' SKU batches';
+  document.getElementById('repUnderlayCost').innerHTML = fmtMoney(uPerKg) + '<small>/kg</small>';
+  document.getElementById('repUnderlayOut').innerHTML = fmtKg(uOut) + ' produced &middot; ' + agg.underlay.rollCount + ' rolls, ' + agg.underlay.batches + ' SKU batches';
+  document.getElementById('repBlended').innerHTML = fmtMoney(blended) + '<small>/kg</small>';
+  document.getElementById('repTotalOut').textContent = fmtKg(tOut) + ' total output';
+  document.getElementById('repTotalCost').textContent = fmtMoney(agg.totalCostExclRaw);
+  document.getElementById('repDaysLogged').textContent = dates.length + ' day' + (dates.length===1?'':'s') + ' logged in range';
+  document.getElementById('repSheetConversion').innerHTML = fmtMoney(sConvPerKg) + '<small>/kg</small>';
+  document.getElementById('repUnderlayConversion').innerHTML = fmtMoney(uConvPerKg) + '<small>/kg</small>';
+  document.getElementById('repSheetEfficiency').innerHTML = sEff.toFixed(2) + '<small>%</small>';
+  document.getElementById('repUnderlayEfficiency').innerHTML = uEff.toFixed(2) + '<small>%</small>';
+
+  // reuse the same composition-table renderer as the dashboard by feeding it a compatible shape
+  const compC = { sheets: {...agg.sheets, outputKg:sOut}, underlay: {...agg.underlay, outputKg:uOut} };
+  renderCompositionTableInto('reportCompositionBody', compC);
+
+  const labels = dates.map(d=>d.slice(5));
+  const sheetVals=[], underlayVals=[], sheetOut=[], underlayOut=[];
+  dates.forEach(d=>{
+    const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{}, (ledger.ledgerByDate[d]||{}).reclaimRate);
+    sheetVals.push(Number(c.sheets.perKg.toFixed(2)));
+    underlayVals.push(Number(c.underlay.perKg.toFixed(2)));
+    sheetOut.push(Number(c.sheets.outputKg.toFixed(1)));
+    underlayOut.push(Number(c.underlay.outputKg.toFixed(1)));
+  });
+  svgLineChart('reportTrendChart', labels, [
+    {name:'Sheets avg ₹/kg', data:sheetVals, color:'#e8a33d'},
+    {name:'Underlay avg ₹/kg', data:underlayVals, color:'#5b8aa6'}
+  ]);
+  svgStackedBarChart('reportOutputChart', labels, [
+    {name:'Sheets kg', data:sheetOut, color:'#e8a33d'},
+    {name:'Underlay kg', data:underlayOut, color:'#5b8aa6'}
+  ]);
+}
+
 function editFromHistory(d){
   document.querySelector('nav.tabs button[data-tab="entry"]').click();
   document.getElementById('entryDate').value = d;
@@ -1934,6 +2152,10 @@ async function init(){
 
   populateDashDateSelect();
   renderDashboard();
+
+  const defaultRange = getPresetRange('last7');
+  document.getElementById('reportFrom').value = defaultRange.from;
+  document.getElementById('reportTo').value = defaultRange.to;
 }
 init();
 </script>
