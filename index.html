@@ -436,6 +436,11 @@
         <button class="btn" onclick="clearEntryForm()">Clear form</button>
         <button class="btn btn-danger" id="deleteEntryBtn" onclick="deleteCurrentEntry()" style="display:none;">Delete this date's entry</button>
       </div>
+      <div class="btn-row" id="moveEntryRow" style="display:none;">
+        <label for="moveToDate" style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;">Move this entry to</label>
+        <input type="date" id="moveToDate">
+        <button class="btn" onclick="moveEntryToDate()">Move</button>
+      </div>
     </div>
   </section>
 
@@ -1721,6 +1726,7 @@ function fillEntryForm(entry){
 function clearEntryForm(){
   const blank = blankEntry(document.getElementById('entryDate').value);
   fillEntryForm(blank);
+  setExistingEntryControlsVisible(false);
   document.getElementById('entryStatus').textContent = '';
 }
 function readEntryForm(){
@@ -1773,6 +1779,7 @@ document.getElementById('entryDate').addEventListener('change', ()=>{
   const existing = ENTRIES[d];
   fillEntryForm(existing || blankEntry(d));
   document.getElementById('deleteEntryBtn').style.display = existing ? 'inline-block' : 'none';
+  document.getElementById('moveEntryRow').style.display = existing ? 'flex' : 'none';
   document.getElementById('entryStatus').textContent = existing ? 'Editing existing log for '+d : 'New entry for '+d;
 });
 
@@ -1782,7 +1789,7 @@ async function saveEntry(){
   const ok = await storageSet('daily:'+e.date, e);
   const statusEl = document.getElementById('entryStatus');
   ENTRIES[e.date] = e; // keep it in memory for this session even if the central save failed
-  document.getElementById('deleteEntryBtn').style.display = 'inline-block';
+  setExistingEntryControlsVisible(true);
   populateDashDateSelect();
   document.getElementById('dashDate').value = e.date;
   renderDashboard();
@@ -1802,10 +1809,51 @@ async function deleteCurrentEntry(){
   await storageDelete('daily:'+d);
   delete ENTRIES[d];
   clearEntryForm();
-  document.getElementById('deleteEntryBtn').style.display = 'none';
+  setExistingEntryControlsVisible(false);
   populateDashDateSelect();
   renderDashboard();
   renderHistory();
+}
+
+function setExistingEntryControlsVisible(visible){
+  document.getElementById('deleteEntryBtn').style.display = visible ? 'inline-block' : 'none';
+  document.getElementById('moveEntryRow').style.display = visible ? 'flex' : 'none';
+}
+
+async function moveEntryToDate(){
+  const oldDate = document.getElementById('entryDate').value;
+  const newDate = document.getElementById('moveToDate').value;
+  const statusEl = document.getElementById('entryStatus');
+  if(!ENTRIES[oldDate]){ statusEl.textContent = 'Nothing to move — this date has no saved entry.'; statusEl.className='status-msg err'; return; }
+  if(!newDate){ statusEl.textContent = 'Pick a target date first.'; statusEl.className='status-msg err'; return; }
+  if(newDate===oldDate){ statusEl.textContent = 'That\'s already the current date.'; statusEl.className='status-msg err'; return; }
+  if(ENTRIES[newDate]){
+    if(!confirm('An entry already exists for '+newDate+'. Moving will permanently overwrite it. Continue?')) return;
+  } else {
+    if(!confirm('Move this entry from '+oldDate+' to '+newDate+'?')) return;
+  }
+
+  const entry = {...ENTRIES[oldDate], date: newDate};
+  const savedNew = await storageSet('daily:'+newDate, entry);
+  if(!savedNew){
+    statusEl.textContent = 'Could not save under the new date (' + (LAST_STORAGE_ERROR||'unknown error') + ') — nothing was moved.';
+    statusEl.className = 'status-msg err';
+    showStorageWarningIfNeeded();
+    return;
+  }
+  await storageDelete('daily:'+oldDate);
+  delete ENTRIES[oldDate];
+  ENTRIES[newDate] = entry;
+
+  document.getElementById('entryDate').value = newDate;
+  fillEntryForm(entry);
+  setExistingEntryControlsVisible(true);
+  populateDashDateSelect();
+  document.getElementById('dashDate').value = newDate;
+  renderDashboard();
+  renderHistory();
+  statusEl.textContent = 'Moved entry from '+oldDate+' to '+newDate+'.';
+  statusEl.className = 'status-msg';
 }
 
 /* ---------------- history ---------------- */
@@ -2001,7 +2049,7 @@ function editFromHistory(d){
   document.querySelector('nav.tabs button[data-tab="entry"]').click();
   document.getElementById('entryDate').value = d;
   fillEntryForm(ENTRIES[d]);
-  document.getElementById('deleteEntryBtn').style.display='inline-block';
+  setExistingEntryControlsVisible(true);
   document.getElementById('entryStatus').textContent = 'Editing existing log for '+d;
 }
 async function deleteFromHistory(d){
@@ -2187,7 +2235,7 @@ async function init(){
   document.getElementById('entryDate').value = todayStr();
   const existingToday = ENTRIES[todayStr()];
   fillEntryForm(existingToday || blankEntry(todayStr()));
-  document.getElementById('deleteEntryBtn').style.display = existingToday ? 'inline-block' : 'none';
+  setExistingEntryControlsVisible(!!existingToday);
 
   populateDashDateSelect();
   renderDashboard();
