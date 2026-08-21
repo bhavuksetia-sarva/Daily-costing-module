@@ -215,7 +215,7 @@
           <p class="kpi-sub" id="kpiTotalOut">&mdash;</p>
         </div>
         <div class="kpi k-neutral">
-          <p class="kpi-label">Total Daily Cost <span style="color:var(--muted-dk);">(excl. raw material)</span></p>
+          <p class="kpi-label">Total Daily Cost <span style="color:var(--muted-dk);">(excl. raw material &amp; consumables)</span></p>
           <div class="kpi-val" id="kpiTotalCost">&mdash;</div>
           <p class="kpi-sub" id="kpiWastage">&mdash;</p>
         </div>
@@ -453,7 +453,7 @@
           <thead>
             <tr>
               <th>Date</th><th>Sheet SKUs</th><th>Sheets out (kg)</th><th>Sheets avg ₹/kg</th>
-              <th>Roll SKUs</th><th>Underlay out (kg)</th><th>Underlay avg ₹/kg</th><th>Total cost excl. raw (₹)</th><th></th>
+              <th>Roll SKUs</th><th>Underlay out (kg)</th><th>Underlay avg ₹/kg</th><th>Total cost excl. raw &amp; consum. (₹)</th><th></th>
             </tr>
           </thead>
           <tbody id="historyBody"></tbody>
@@ -505,7 +505,7 @@
           <p class="kpi-sub" id="repTotalOut">&mdash;</p>
         </div>
         <div class="kpi k-neutral">
-          <p class="kpi-label">Total Cost <span style="color:var(--muted-dk);">(excl. raw material)</span></p>
+          <p class="kpi-label">Total Cost <span style="color:var(--muted-dk);">(excl. raw material &amp; consumables)</span></p>
           <div class="kpi-val" id="repTotalCost">&mdash;</div>
           <p class="kpi-sub" id="repDaysLogged">&mdash;</p>
         </div>
@@ -1164,7 +1164,7 @@ function computeDay(e, settings, materialRates, reclaimRate){
   const totalCost = sheets.total+underlay.total;
   const totalOut = sheets.outputKg+underlay.outputKg;
   const blended = totalOut>0 ? totalCost/totalOut : 0;
-  const totalCostExclRaw = totalCost - sheets.raw - underlay.raw;
+  const totalCostExclRaw = totalCost - sheets.raw - underlay.raw - underlay.consum;
 
   return { sheets, underlay, totalCost, totalCostExclRaw, totalOut, blended, dailyOverhead };
 }
