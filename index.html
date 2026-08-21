@@ -373,12 +373,12 @@
         <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">Raw materials used &mdash; sheet blocks</p>
         <div class="batch-tbl-wrap">
           <table class="batch-tbl">
-            <thead><tr><th>Material</th><th>Qty (kg)</th><th>Rate ₹/kg <span style="color:var(--muted-dk);">(ledger)</span></th><th>Cost</th><th></th></tr></thead>
+            <thead><tr><th>Material</th><th>Qty (kg)</th><th>% of Qty</th><th>Rate ₹/kg <span style="color:var(--muted-dk);">(ledger)</span></th><th>Cost</th><th></th></tr></thead>
             <tbody id="sheetRawBody"></tbody>
           </table>
         </div>
         <div class="btn-row" style="margin-top:10px;"><button class="btn btn-sm" onclick="addSheetRaw()">+ Add material</button></div>
-        <div class="note-box">Rate is the current weighted-average cost from the stock ledger, not typed in — it updates automatically as purchases come in. A * means no purchase has been logged for that material yet, so it's using the fallback rate from Settings; a ⚠ means this day draws more than the ledger shows in stock.</div>
+        <div class="note-box">Rate is the current weighted-average cost from the stock ledger, not typed in — it updates automatically as purchases come in. A * means no purchase has been logged for that material yet, so it's using the fallback rate from Settings; a ⚠ means this day draws more than the ledger shows in stock. If you've entered trim wastage above, its value is shown here as a credit against these materials. % of Qty is each material's share of the total raw material weight going into this line.</div>
         <div class="hairline"></div>
         <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">SKUs produced today</p>
         <div class="batch-tbl-wrap">
@@ -409,12 +409,12 @@
         <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">Raw materials used &mdash; round (cylindrical) blocks</p>
         <div class="batch-tbl-wrap">
           <table class="batch-tbl">
-            <thead><tr><th>Material</th><th>Qty (kg)</th><th>Rate ₹/kg <span style="color:var(--muted-dk);">(ledger)</span></th><th>Cost</th><th></th></tr></thead>
+            <thead><tr><th>Material</th><th>Qty (kg)</th><th>% of Qty</th><th>Rate ₹/kg <span style="color:var(--muted-dk);">(ledger)</span></th><th>Cost</th><th></th></tr></thead>
             <tbody id="underlayRawBody"></tbody>
           </table>
         </div>
         <div class="btn-row" style="margin-top:10px;"><button class="btn btn-sm" onclick="addUnderlayRaw()">+ Add material</button></div>
-        <div class="note-box">Rate is the current weighted-average cost from the stock ledger. If sheets and round blocks use the same material on the same day, both draw from one shared stock balance.</div>
+        <div class="note-box">Rate is the current weighted-average cost from the stock ledger. If sheets and round blocks use the same material on the same day, both draw from one shared stock balance. If you've entered wastage above, its value is shown here as a credit against these materials. % of Qty is each material's share of the total raw material weight going into this line.</div>
         <div class="hairline"></div>
         <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">SKUs (rolls) produced today <span style="color:var(--muted-dk);">&mdash; pick a SKU to auto-fill its material cost, or leave as Custom and enter your own</span></p>
         <div class="batch-tbl-wrap">
@@ -1207,15 +1207,18 @@ function rawMaterialOptions(selectedId){
   });
   return opts.join('');
 }
-function renderRawRows(list, bodyId, updateFn, removeFn, selectFn){
+function findReclaimMaterial(){
+  return RAW_MATERIAL_MASTER.find(m=>/rebond/i.test(m.name||''));
+}
+function renderRawRows(list, bodyId, updateFn, removeFn, selectFn, wastageFieldId){
   const body = document.getElementById(bodyId);
   if(list.length===0){
-    body.innerHTML = `<tr><td colspan="5" class="batch-empty">No materials added yet.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="batch-empty">No materials added yet.</td></tr>`;
     return;
   }
-  const { materialRates } = currentEditingLedgerRates();
+  const { materialRates, reclaimRate } = currentEditingLedgerRates();
   let sumQty=0, sumCost=0;
-  const rows = list.map(m=>{
+  const rowsData = list.map(m=>{
     const resolved = materialRates[m.materialId];
     const fallback = (RAW_MATERIAL_MASTER.find(x=>x.id===m.materialId)||{}).rate || 0;
     const rateUsed = resolved ? resolved.avgCostToCharge : fallback;
@@ -1225,25 +1228,49 @@ function renderRawRows(list, bodyId, updateFn, removeFn, selectFn){
     const warn = resolved && resolved.warning;
     const noLedger = m.materialId && !resolved;
     const rateTitle = !m.materialId ? '' : (noLedger ? 'No purchases logged for this material yet — using the fallback rate from Settings.' : 'Weighted-average cost from the stock ledger.') + (warn ? ' Warning: consumption on this day exceeds recorded stock.' : '');
-    return `<tr>
+    return { m, rateUsed, qty, cost, warn, noLedger, rateTitle };
+  });
+
+  const wastageKg = num(wastageFieldId) || 0;
+  const creditRate = reclaimRate || 0;
+  const creditCost = wastageKg * creditRate;
+  const netCost = sumCost - creditCost;
+  const pctOfQty = (qty) => sumQty>0 ? ((qty/sumQty)*100).toFixed(1)+'%' : '—';
+
+  const rows = rowsData.map(({m, rateUsed, qty, cost, warn, noLedger, rateTitle})=>`<tr>
       <td><select onchange="${selectFn}('${m.id}', this.value)">${rawMaterialOptions(m.materialId)}</select></td>
       <td><input type="number" min="0" step="any" value="${m.qtyKg||''}" onchange="${updateFn}('${m.id}',this.value)" oninput="updateLivePreview()"></td>
+      <td style="font-family:var(--f-mono);color:var(--muted);">${m.materialId && qty>0 ? pctOfQty(qty) : '—'}</td>
       <td style="font-family:var(--f-mono);color:${warn?'var(--bad)':'var(--muted)'};" title="${rateTitle}">${m.materialId ? fmtMoney(rateUsed) + (noLedger?' *':'') + (warn?' ⚠':'') : '—'}</td>
       <td style="font-family:var(--f-mono);color:var(--muted);">${fmtMoney(cost)}</td>
       <td><button class="batch-rm" onclick="${removeFn}('${m.id}')">Remove</button></td>
-    </tr>`;
-  }).join('');
-  const totalRow = `<tr class="total-row">
-    <td>Total</td>
-    <td style="font-family:var(--f-mono);">${fmtKg(sumQty)}</td>
-    <td></td>
-    <td style="font-family:var(--f-mono);">${fmtMoney(sumCost)}</td>
+    </tr>`).join('');
+
+  const subtotalRow = `<tr>
+    <td colspan="4" style="color:var(--muted);">Subtotal, before wastage credit</td>
+    <td style="font-family:var(--f-mono);color:var(--muted);">${fmtMoney(sumCost)}</td>
     <td></td>
   </tr>`;
-  body.innerHTML = rows + totalRow;
+
+  const reclaimMat = findReclaimMaterial();
+  const creditRow = wastageKg>0 ? `<tr>
+    <td colspan="4" style="color:var(--good);">Reclaimed wastage credit ${reclaimMat ? '('+reclaimMat.name+')' : ''} <span style="color:var(--muted-dk);">(${fmtKg(wastageKg)} @ ${fmtMoney(creditRate)}/kg)</span></td>
+    <td style="font-family:var(--f-mono);color:var(--good);">&minus;${fmtMoney(creditCost)}</td>
+    <td></td>
+  </tr>` : '';
+
+  const totalRow = `<tr class="total-row">
+    <td>Net raw material cost</td>
+    <td style="font-family:var(--f-mono);">${fmtKg(sumQty)}</td>
+    <td style="font-family:var(--f-mono);">${sumQty>0?'100%':'—'}</td>
+    <td></td>
+    <td style="font-family:var(--f-mono);">${fmtMoney(netCost)}</td>
+    <td></td>
+  </tr>`;
+  body.innerHTML = rows + subtotalRow + creditRow + totalRow;
 }
-function renderSheetRawRows(){ renderRawRows(CURRENT_SHEET_RAWMATS, 'sheetRawBody', 'updateSheetRaw', 'removeSheetRaw', 'selectSheetRaw'); }
-function renderUnderlayRawRows(){ renderRawRows(CURRENT_UNDERLAY_RAWMATS, 'underlayRawBody', 'updateUnderlayRaw', 'removeUnderlayRaw', 'selectUnderlayRaw'); }
+function renderSheetRawRows(){ renderRawRows(CURRENT_SHEET_RAWMATS, 'sheetRawBody', 'updateSheetRaw', 'removeSheetRaw', 'selectSheetRaw', 'sh_wastageKg'); }
+function renderUnderlayRawRows(){ renderRawRows(CURRENT_UNDERLAY_RAWMATS, 'underlayRawBody', 'updateUnderlayRaw', 'removeUnderlayRaw', 'selectUnderlayRaw', 'u_wastageKg'); }
 function refreshRawMaterialDisplays(){ renderSheetRawRows(); renderUnderlayRawRows(); }
 
 function addSheetRaw(){ CURRENT_SHEET_RAWMATS.push({id:newBatchId(), materialId:'', materialName:'', qtyKg:0}); renderSheetRawRows(); updateLivePreview(); }
@@ -1738,6 +1765,8 @@ ENTRY_FIELD_IDS.forEach(id=>{
   if(el) el.addEventListener('input', updateLivePreview);
 });
 document.getElementById('u_totalGlueKg').addEventListener('input', ()=>{ renderUnderlayBatchRows(); });
+document.getElementById('sh_wastageKg').addEventListener('input', ()=>{ renderSheetRawRows(); });
+document.getElementById('u_wastageKg').addEventListener('input', ()=>{ renderUnderlayRawRows(); });
 
 document.getElementById('entryDate').addEventListener('change', ()=>{
   const d = document.getElementById('entryDate').value;
