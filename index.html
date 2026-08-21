@@ -647,6 +647,8 @@
         <div class="field"><label>Nonwoven GSM <span class="unit">(g/m²)</span></label><input type="number" id="p_nonwovenGSM" min="0" step="any"></div>
         <div class="field"><label>Paper, brown <span class="unit">(₹/linear m)</span></label><input type="number" id="p_paperBrown" min="0" step="any"></div>
         <div class="field"><label>Paper, white <span class="unit">(₹/linear m)</span></label><input type="number" id="p_paperWhite" min="0" step="any"></div>
+        <div class="field"><label>Wilkies Brown Paper <span class="unit">(₹/linear m)</span></label><input type="number" id="p_wilkiesBrownPaper" min="0" step="any"></div>
+        <div class="field"><label>Wilkies White Paper <span class="unit">(₹/linear m)</span></label><input type="number" id="p_wilkiesWhitePaper" min="0" step="any"></div>
         <div class="field"><label>PE film <span class="unit">(₹/linear m)</span></label><input type="number" id="p_peFilm" min="0" step="any"></div>
         <div class="field"><label>Silver foil <span class="unit">(₹/linear m)</span></label><input type="number" id="p_silverFoil" min="0" step="any"></div>
         <div class="field"><label>Printed bag <span class="unit">(₹/bag)</span></label><input type="number" id="p_printedBag" min="0" step="any"></div>
@@ -670,7 +672,7 @@
         <button class="btn btn-sm" onclick="addMasterSku()">+ Add SKU</button>
         <button class="btn btn-primary" onclick="saveMasterSkus()">Save SKU master</button>
       </div>
-      <div class="note-box">Front/back backing text is matched by keyword: "NONWOVEN" (+ "PRINT" for printed rate), "PAPER" (+ "WHITE" for white rate), "PE FILM", or "FOIL". Outer bag is matched by "PRINTED" vs everything else (clear/color bag rate). Weight/roll = Length × Width × Thickness(m) × Density.</div>
+      <div class="note-box">Front/back backing text is matched by keyword: "NONWOVEN" (+ "PRINT" for printed rate), "COREFRESH" (priced as Wilkies paper, + "WHITE" for the white variant — checked before the generic paper match, so any name containing both still gets the Wilkies rate), "PAPER" (+ "WHITE" for white rate), "PE FILM", or "FOIL". Outer bag is matched by "PRINTED" vs everything else (clear/color bag rate). Weight/roll = Length × Width × Thickness(m) × Density.</div>
       <div class="status-msg" id="masterSkuStatus"></div>
     </div>
 
@@ -708,7 +710,7 @@ function newBatchId(){ return 'b' + (batchIdCounter++) + '_' + Date.now().toStri
 /* ---------------- roll SKU master + pricing ---------------- */
 const DEFAULT_PRICING = {
   nonwovenPlain:180, nonwovenPrinted:220, nonwovenWidthM:1.45, nonwovenGSM:25,
-  paperBrown:30, paperWhite:35, peFilm:25, silverFoil:20,
+  paperBrown:30, paperWhite:35, wilkiesBrownPaper:30, wilkiesWhitePaper:35, peFilm:25, silverFoil:20,
   printedBag:50, otherBag:35, glueRate:250
 };
 let PRICING = {...DEFAULT_PRICING};
@@ -756,6 +758,7 @@ function skuWeightPerRoll(sku){
 function classifyMaterial(text){
   const t = (text||'').toUpperCase();
   if(t.includes('NONWOVEN')) return {type:'nonwoven', printed:t.includes('PRINT'), white:false};
+  if(t.includes('COREFRESH')) return {type:'wilkiespaper', printed:false, white:t.includes('WHITE')};
   if(t.includes('PAPER')) return {type:'paper', printed:false, white:t.includes('WHITE')};
   if(t.includes('PE FILM') || t.includes('PEFILM')) return {type:'pefilm', printed:false, white:false};
   if(t.includes('FOIL')) return {type:'foil', printed:false, white:false};
@@ -767,6 +770,10 @@ function materialCostPerRoll(text, lengthM, pricing){
     const kg = lengthM * pricing.nonwovenWidthM * pricing.nonwovenGSM/1000;
     const rate = info.printed ? pricing.nonwovenPrinted : pricing.nonwovenPlain;
     return kg*rate;
+  }
+  if(info.type==='wilkiespaper'){
+    const rate = info.white ? pricing.wilkiesWhitePaper : pricing.wilkiesBrownPaper;
+    return lengthM*rate;
   }
   if(info.type==='paper'){
     const rate = info.white ? pricing.paperWhite : pricing.paperBrown;
@@ -2015,6 +2022,8 @@ function fillPricingForm(){
   document.getElementById('p_nonwovenGSM').value = PRICING.nonwovenGSM;
   document.getElementById('p_paperBrown').value = PRICING.paperBrown;
   document.getElementById('p_paperWhite').value = PRICING.paperWhite;
+  document.getElementById('p_wilkiesBrownPaper').value = PRICING.wilkiesBrownPaper;
+  document.getElementById('p_wilkiesWhitePaper').value = PRICING.wilkiesWhitePaper;
   document.getElementById('p_peFilm').value = PRICING.peFilm;
   document.getElementById('p_silverFoil').value = PRICING.silverFoil;
   document.getElementById('p_printedBag').value = PRICING.printedBag;
@@ -2026,6 +2035,7 @@ async function savePricing(){
     nonwovenPlain:num('p_nonwovenPlain'), nonwovenPrinted:num('p_nonwovenPrinted'),
     nonwovenWidthM:num('p_nonwovenWidthM'), nonwovenGSM:num('p_nonwovenGSM'),
     paperBrown:num('p_paperBrown'), paperWhite:num('p_paperWhite'),
+    wilkiesBrownPaper:num('p_wilkiesBrownPaper'), wilkiesWhitePaper:num('p_wilkiesWhitePaper'),
     peFilm:num('p_peFilm'), silverFoil:num('p_silverFoil'),
     printedBag:num('p_printedBag'), otherBag:num('p_otherBag'),
     glueRate:num('p_glueRate')
