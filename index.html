@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Daily Cost Console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -364,6 +365,12 @@
         <span class="chevron">&#9660;</span>
       </div>
       <div class="stage-body">
+        <div class="note-box" style="background:var(--panel3);border-color:var(--border-lt);">
+          <div style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Import from Excel <span style="color:var(--muted-dk);">— sums every block row for the chosen date into raw materials, blocks, output, and wastage below</span></div>
+          <input type="file" id="sheetExcelFile" accept=".xlsx,.xls" style="display:none;" onchange="handleSheetExcelFile(this.files[0])">
+          <button class="btn btn-sm" type="button" onclick="document.getElementById('sheetExcelFile').click()">Choose Excel file</button>
+          <div id="excelImportPreview" style="margin-top:10px;"></div>
+        </div>
         <div class="field-grid">
           <div class="field"><label>Cutting stage labor <span class="unit">(headcount)</span></label><input type="number" id="sh_laborCount" min="0" step="1"></div>
           <div class="field"><label>Cutting stage electricity <span class="unit">(kWh)</span></label><input type="number" id="sh_elecUnits" min="0" step="any"></div>
@@ -1343,6 +1350,159 @@ function selectPurchaseMaterial(id, materialId){
   const mat = RAW_MATERIAL_MASTER.find(x=>x.id===materialId);
   if(mat){ p.materialName = mat.name; if(!p.rate) p.rate = mat.rate; }
   renderPurchaseRows(); refreshRawMaterialDisplays(); updateLivePreview();
+}
+
+/* ---------------- Excel import — Sheets line only, for now ---------------- */
+let EXCEL_IMPORT_DATA = null;
+
+function excelDateToISO(val){
+  if(val instanceof Date && !isNaN(val)) return val.toISOString().slice(0,10);
+  if(typeof val === 'number'){
+    const utc_days = Math.floor(val - 25569);
+    const d = new Date(utc_days*86400*1000);
+    return isNaN(d) ? '' : d.toISOString().slice(0,10);
+  }
+  if(typeof val === 'string'){
+    const t = val.trim();
+    const d = new Date(t);
+    if(!isNaN(d) && /\d{4}/.test(t)) return d.toISOString().slice(0,10);
+    return t;
+  }
+  return '';
+}
+
+function aggregateSheetExcelRows(wsData){
+  if(!wsData || wsData.length<2) throw new Error('No data rows found.');
+  const headerRow = wsData[0].map(h=>String(h==null?'':h).trim());
+  const idx = {};
+  headerRow.forEach((h,i)=>{ if(h && !(h in idx)) idx[h]=i; });
+  const need = ['DATE','Imported Scrap','Local','Re-bonded','Hard Binder 1519','Medium Binder 1513','Soft Binder 1026/3156','Other Binder','Block Total','Total output wt','Wt. of Scrap (kg)'];
+  const missing = need.filter(k=>!(k in idx));
+  if(missing.length) throw new Error('Missing expected column(s): '+missing.join(', ')+'. Check this is the "Sheet Production Data" tab with unchanged headers.');
+
+  const num = (row,key) => { const v = row[idx[key]]; const n = parseFloat(v); return isFinite(n) ? n : 0; };
+  const byDate = {};
+  for(let r=1;r<wsData.length;r++){
+    const row = wsData[r];
+    if(!row || row.length===0) continue;
+    const rawDate = row[idx['DATE']];
+    if(rawDate===undefined || rawDate==='') continue;
+    const dateStr = excelDateToISO(rawDate);
+    if(!dateStr) continue;
+    if(!byDate[dateStr]) byDate[dateStr] = {date:dateStr, localKg:0, importedKg:0, rebondedKg:0, binderKg:0, blockTotalKg:0, outputKg:0, scrapKg:0, rows:0};
+    const agg = byDate[dateStr];
+    agg.localKg += num(row,'Local');
+    agg.importedKg += num(row,'Imported Scrap');
+    agg.rebondedKg += num(row,'Re-bonded');
+    agg.binderKg += num(row,'Hard Binder 1519')+num(row,'Medium Binder 1513')+num(row,'Soft Binder 1026/3156')+num(row,'Other Binder');
+    agg.blockTotalKg += num(row,'Block Total');
+    agg.outputKg += num(row,'Total output wt');
+    agg.scrapKg += num(row,'Wt. of Scrap (kg)');
+    agg.rows += 1;
+  }
+  return byDate;
+}
+
+async function handleSheetExcelFile(file){
+  if(!file) return;
+  const previewEl = document.getElementById('excelImportPreview');
+  previewEl.innerHTML = '<span class="loading-note">Reading file...</span>';
+  try{
+    if(typeof XLSX === 'undefined') throw new Error('Excel reader did not load — check your internet connection and refresh the page.');
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellDates:true});
+    const sheetName = wb.SheetNames.find(n=>/production/i.test(n)) || wb.SheetNames.find(n=>/sheet.*data/i.test(n)) || wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const wsData = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
+    const byDate = aggregateSheetExcelRows(wsData);
+    const dates = Object.keys(byDate).sort();
+    if(dates.length===0){ previewEl.innerHTML = '<div class="status-msg err">No usable dated rows found in "'+sheetName+'".</div>'; return; }
+    EXCEL_IMPORT_DATA = byDate;
+    const currentDate = document.getElementById('entryDate').value;
+    const defaultDate = byDate[currentDate] ? currentDate : dates[dates.length-1];
+    renderExcelImportPreview(dates, defaultDate);
+  }catch(e){
+    previewEl.innerHTML = '<div class="status-msg err">Could not read that file: '+(e.message||e)+'</div>';
+  }
+}
+
+function renderExcelImportPreview(dates, selectedDate){
+  const previewEl = document.getElementById('excelImportPreview');
+  const a = EXCEL_IMPORT_DATA[selectedDate];
+  const opts = dates.map(d=>`<option value="${d}" ${d===selectedDate?'selected':''}>${d} (${EXCEL_IMPORT_DATA[d].rows} blocks)</option>`).join('');
+  previewEl.innerHTML = `
+    <div class="field" style="max-width:320px;">
+      <label>Date to import <span class="unit">(${dates.length} found in file)</span></label>
+      <select onchange="renderExcelImportPreview(${JSON.stringify(dates).replace(/"/g,'&quot;')}, this.value)">${opts}</select>
+    </div>
+    <div class="preview-strip" style="margin-top:10px;">
+      <div class="preview-item"><span class="l">Local Foam Scrap</span><span class="v">${fmtKg(a.localKg)}</span></div>
+      <div class="preview-item"><span class="l">Imported Foam Scrap</span><span class="v">${fmtKg(a.importedKg)}</span></div>
+      <div class="preview-item"><span class="l">Rebonded Foam</span><span class="v">${fmtKg(a.rebondedKg)}</span></div>
+      <div class="preview-item"><span class="l">Binder / Adhesive</span><span class="v">${fmtKg(a.binderKg)}</span></div>
+      <div class="preview-item"><span class="l">Block total (raw input)</span><span class="v amber">${fmtKg(a.blockTotalKg)}</span></div>
+      <div class="preview-item"><span class="l">Total output</span><span class="v">${fmtKg(a.outputKg)}</span></div>
+      <div class="preview-item"><span class="l">Trim wastage</span><span class="v">${fmtKg(a.scrapKg)}</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="applyExcelImport('${selectedDate}')">Import this date into Daily Log</button>
+      <button class="btn" onclick="document.getElementById('excelImportPreview').innerHTML=''; EXCEL_IMPORT_DATA=null; document.getElementById('sheetExcelFile').value='';">Cancel</button>
+    </div>
+    <div class="note-box">This fills Local/Imported/Rebonded/Binder quantities, Blocks made for Sheets line, Trim wastage, and one "[Excel Import]" sheet SKU output row for ${selectedDate} — nothing else on that date is touched, and nothing saves to the shared database until you click "Save daily log" below.</div>
+  `;
+}
+
+function applyExcelImport(dateStr){
+  const a = EXCEL_IMPORT_DATA && EXCEL_IMPORT_DATA[dateStr];
+  if(!a) return;
+
+  if(document.getElementById('entryDate').value !== dateStr){
+    document.getElementById('entryDate').value = dateStr;
+    fillEntryForm(ENTRIES[dateStr] || blankEntry(dateStr));
+    setExistingEntryControlsVisible(!!ENTRIES[dateStr]);
+  }
+
+  function setMaterialQty(nameRegex, qty){
+    const mat = RAW_MATERIAL_MASTER.find(m=>nameRegex.test(m.name||''));
+    if(qty<=0) return {matched: !!mat};
+    if(!mat) return {matched:false};
+    let row = CURRENT_SHEET_RAWMATS.find(r=>r.materialId===mat.id);
+    if(!row){ row = {id:newBatchId(), materialId:mat.id, materialName:mat.name, qtyKg:0}; CURRENT_SHEET_RAWMATS.push(row); }
+    row.qtyKg = Number(qty.toFixed(2));
+    return {matched:true};
+  }
+  const results = [
+    ['Local Foam Scrap', setMaterialQty(/local/i, a.localKg)],
+    ['Imported Foam Scrap', setMaterialQty(/import/i, a.importedKg)],
+    ['Rebonded Foam', setMaterialQty(/rebond/i, a.rebondedKg)],
+    ['Binder / Adhesive', setMaterialQty(/binder/i, a.binderKg)]
+  ];
+
+  document.getElementById('s_sheetBlocksKg').value = Number(a.blockTotalKg.toFixed(2));
+  document.getElementById('sh_wastageKg').value = Number(a.scrapKg.toFixed(2));
+
+  let outRow = CURRENT_SHEET_BATCHES.find(b=>b.spec && b.spec.indexOf('[Excel Import]')===0);
+  if(!outRow){ outRow = {id:newBatchId(), spec:'', outputKg:0}; CURRENT_SHEET_BATCHES.push(outRow); }
+  outRow.spec = '[Excel Import] '+dateStr+' — '+a.rows+' blocks';
+  outRow.outputKg = Number(a.outputKg.toFixed(2));
+
+  refreshRawMaterialDisplays();
+  renderSheetBatchRows();
+  renderSheetRawRows();
+  updateLivePreview();
+
+  const unmatched = results.filter(([,r])=>r && r.matched===false).map(([n])=>n);
+  const statusEl = document.getElementById('entryStatus');
+  document.getElementById('excelImportPreview').innerHTML = '';
+  document.getElementById('sheetExcelFile').value = '';
+  EXCEL_IMPORT_DATA = null;
+  if(unmatched.length){
+    statusEl.textContent = 'Imported for '+dateStr+', but found no raw material matching: '+unmatched.join(', ')+' — add it in Settings and re-import, or enter it manually. Review before saving.';
+    statusEl.className = 'status-msg err';
+  } else {
+    statusEl.textContent = 'Imported Excel data for '+dateStr+'. Review the values below, then click Save daily log.';
+    statusEl.className = 'status-msg';
+  }
 }
 
 /* ---------------- SKU batch rows (entry form) ---------------- */
