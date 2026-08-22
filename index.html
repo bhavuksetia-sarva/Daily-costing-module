@@ -1410,7 +1410,7 @@ async function handleSheetExcelFile(file){
   try{
     if(typeof XLSX === 'undefined') throw new Error('Excel reader did not load — check your internet connection and refresh the page.');
     const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, {type:'array', cellDates:true});
+    const wb = XLSX.read(buf, {type:'array'}); // no cellDates — keep dates as raw serial numbers; excelDateToISO() converts them with pure UTC day-arithmetic, avoiding a timezone-dependent off-by-one that cellDates:true introduces (e.g. rolls dates back a day for anyone in IST)
     const sheetName = wb.SheetNames.find(n=>/production/i.test(n)) || wb.SheetNames.find(n=>/sheet.*data/i.test(n)) || wb.SheetNames[0];
     const ws = wb.Sheets[sheetName];
     const wsData = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
