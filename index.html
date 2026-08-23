@@ -404,6 +404,12 @@
         <span class="chevron">&#9660;</span>
       </div>
       <div class="stage-body">
+        <div class="note-box" style="background:var(--panel3);border-color:var(--border-lt);">
+          <div style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Import from Excel <span style="color:var(--muted-dk);">— sums every round block row for the chosen date, and matches each Product SKU against your SKU master</span></div>
+          <input type="file" id="underlayExcelFile" accept=".xlsx,.xls" style="display:none;" onchange="handleUnderlayExcelFile(this.files[0])">
+          <button class="btn btn-sm" type="button" onclick="document.getElementById('underlayExcelFile').click()">Choose Excel file</button>
+          <div id="underlayExcelImportPreview" style="margin-top:10px;"></div>
+        </div>
         <div class="field-grid">
           <div class="field"><label>Peeling labor <span class="unit">(headcount)</span></label><input type="number" id="u_peelLaborCount" min="0" step="1"></div>
           <div class="field"><label>Peeling electricity <span class="unit">(kWh)</span></label><input type="number" id="u_peelElecUnits" min="0" step="any"></div>
@@ -1352,8 +1358,57 @@ function selectPurchaseMaterial(id, materialId){
   renderPurchaseRows(); refreshRawMaterialDisplays(); updateLivePreview();
 }
 
-/* ---------------- Excel import — Sheets line only, for now ---------------- */
+/* ---------------- Excel import — shared helpers ---------------- */
 let EXCEL_IMPORT_DATA = null;
+let EXCEL_LABOR_ELEC = null;
+
+function normHeader(h){ return String(h==null?'':h).replace(/\s+/g,' ').trim(); }
+function findSheetName(wb, patterns){
+  for(const p of patterns){ const n = wb.SheetNames.find(nm=>p.test(nm)); if(n) return n; }
+  return null;
+}
+function parseLaborElecTab(wb){
+  const name = findSheetName(wb, [/labou?r.*electric/i]);
+  if(!name) return null;
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, raw:true, defval:''});
+  const result = {};
+  for(let r=1;r<rows.length;r++){
+    const row = rows[r]; if(!row || !row[0]) continue;
+    const stage = normHeader(row[0]);
+    const labor = parseFloat(row[1]); const elec = parseFloat(row[2]);
+    if(/foaming/i.test(stage)){ if(isFinite(labor)) result.foamingLabor=labor; if(isFinite(elec)) result.foamingElec=elec; }
+    else if(/cutting/i.test(stage)){ if(isFinite(labor)) result.cuttingLabor=labor; if(isFinite(elec)) result.cuttingElec=elec; }
+    else if(/peeling/i.test(stage)){ if(isFinite(labor)) result.peelingLabor=labor; if(isFinite(elec)) result.peelingElec=elec; }
+    else if(/lamination/i.test(stage)){ if(isFinite(labor)) result.laminationLabor=labor; if(isFinite(elec)) result.laminationElec=elec; }
+  }
+  return Object.keys(result).length ? result : null;
+}
+function applyLaborElecFields(le){
+  if(!le) return;
+  const set = (id,val) => { if(val!=null){ document.getElementById(id).value = val; } };
+  set('s_laborCount', le.foamingLabor); set('s_elecUnits', le.foamingElec);
+  set('sh_laborCount', le.cuttingLabor); set('sh_elecUnits', le.cuttingElec);
+  set('u_peelLaborCount', le.peelingLabor); set('u_peelElecUnits', le.peelingElec);
+  set('u_lamLaborCount', le.laminationLabor); set('u_lamElecUnits', le.laminationElec);
+}
+function laborElecPreviewHTML(le){
+  if(!le) return '';
+  const row = (l,e) => (l!=null||e!=null) ? `${l!=null?l:'—'} people / ${e!=null?e:'—'} kWh` : '—';
+  return `
+    <div class="hairline"></div>
+    <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">Labor &amp; electricity (from "Labour and electricity status" tab)</p>
+    <div class="preview-strip" style="margin-top:0;">
+      <div class="preview-item"><span class="l">Foaming</span><span class="v">${row(le.foamingLabor, le.foamingElec)}</span></div>
+      <div class="preview-item"><span class="l">Cutting</span><span class="v">${row(le.cuttingLabor, le.cuttingElec)}</span></div>
+      <div class="preview-item"><span class="l">Peeling</span><span class="v">${row(le.peelingLabor, le.peelingElec)}</span></div>
+      <div class="preview-item"><span class="l">Lamination</span><span class="v">${row(le.laminationLabor, le.laminationElec)}</span></div>
+    </div>`;
+}
+function matchMasterSku(name){
+  const target = String(name||'').trim().toLowerCase();
+  if(!target) return null;
+  return MASTER_SKUS.find(s=>String(s.name||'').trim().toLowerCase()===target) || null;
+}
 
 function excelDateToISO(val){
   if(val instanceof Date && !isNaN(val)) return val.toISOString().slice(0,10);
@@ -1418,6 +1473,7 @@ async function handleSheetExcelFile(file){
     const dates = Object.keys(byDate).sort();
     if(dates.length===0){ previewEl.innerHTML = '<div class="status-msg err">No usable dated rows found in "'+sheetName+'".</div>'; return; }
     EXCEL_IMPORT_DATA = byDate;
+    EXCEL_LABOR_ELEC = parseLaborElecTab(wb);
     const currentDate = document.getElementById('entryDate').value;
     const defaultDate = byDate[currentDate] ? currentDate : dates[dates.length-1];
     renderExcelImportPreview(dates, defaultDate);
@@ -1444,11 +1500,12 @@ function renderExcelImportPreview(dates, selectedDate){
       <div class="preview-item"><span class="l">Total output</span><span class="v">${fmtKg(a.outputKg)}</span></div>
       <div class="preview-item"><span class="l">Trim wastage</span><span class="v">${fmtKg(a.scrapKg)}</span></div>
     </div>
+    ${laborElecPreviewHTML(EXCEL_LABOR_ELEC)}
     <div class="btn-row">
       <button class="btn btn-primary" onclick="applyExcelImport('${selectedDate}')">Import this date into Daily Log</button>
-      <button class="btn" onclick="document.getElementById('excelImportPreview').innerHTML=''; EXCEL_IMPORT_DATA=null; document.getElementById('sheetExcelFile').value='';">Cancel</button>
+      <button class="btn" onclick="document.getElementById('excelImportPreview').innerHTML=''; EXCEL_IMPORT_DATA=null; EXCEL_LABOR_ELEC=null; document.getElementById('sheetExcelFile').value='';">Cancel</button>
     </div>
-    <div class="note-box">This fills Local/Imported/Rebonded/Binder quantities, Blocks made for Sheets line, Trim wastage, and one "[Excel Import]" sheet SKU output row for ${selectedDate} — nothing else on that date is touched, and nothing saves to the shared database until you click "Save daily log" below.</div>
+    <div class="note-box">This fills Local/Imported/Rebonded/Binder quantities, Blocks made for Sheets line, Trim wastage, one "[Excel Import]" sheet SKU output row, and labor/electricity for all four stages (if found) for ${selectedDate} — nothing else on that date is touched, and nothing saves to the shared database until you click "Save daily log" below.</div>
   `;
 }
 
@@ -1480,6 +1537,7 @@ function applyExcelImport(dateStr){
 
   document.getElementById('s_sheetBlocksKg').value = Number(a.blockTotalKg.toFixed(2));
   document.getElementById('sh_wastageKg').value = Number(a.scrapKg.toFixed(2));
+  applyLaborElecFields(EXCEL_LABOR_ELEC);
 
   let outRow = CURRENT_SHEET_BATCHES.find(b=>b.spec && b.spec.indexOf('[Excel Import]')===0);
   if(!outRow){ outRow = {id:newBatchId(), spec:'', outputKg:0}; CURRENT_SHEET_BATCHES.push(outRow); }
@@ -1496,11 +1554,192 @@ function applyExcelImport(dateStr){
   document.getElementById('excelImportPreview').innerHTML = '';
   document.getElementById('sheetExcelFile').value = '';
   EXCEL_IMPORT_DATA = null;
+  EXCEL_LABOR_ELEC = null;
   if(unmatched.length){
     statusEl.textContent = 'Imported for '+dateStr+', but found no raw material matching: '+unmatched.join(', ')+' — add it in Settings and re-import, or enter it manually. Review before saving.';
     statusEl.className = 'status-msg err';
   } else {
     statusEl.textContent = 'Imported Excel data for '+dateStr+'. Review the values below, then click Save daily log.';
+    statusEl.className = 'status-msg';
+  }
+}
+
+/* ---------------- Excel import — Underlay (round block) line ---------------- */
+let EXCEL_UNDERLAY_DATA = null;
+let EXCEL_UNDERLAY_LABOR_ELEC = null;
+
+function aggregateUnderlayExcelRows(wsData){
+  if(!wsData || wsData.length<2) throw new Error('No data rows found.');
+  const headerRow = wsData[0].map(normHeader);
+  const idx = {};
+  headerRow.forEach((h,i)=>{ if(h && !(h in idx)) idx[h]=i; });
+  const need = ['Date','Roll Nos','Product SKU','Imported Foam Scrap','Local Foam Scrap','Rebonded Foam Scrap','Memory Foam Scrap','Hard Binder 1519','Soft Binder 1513','Soft Binder 1026','Total wastage (edge trimming)','Wastage (Peeling)'];
+  const missing = need.filter(k=>!(k in idx));
+  if(missing.length) throw new Error('Missing expected column(s): '+missing.join(', ')+'. Check this is the "Round Block data" tab with unchanged headers.');
+
+  const num = (row,key) => { const v = row[idx[key]]; const n = parseFloat(v); return isFinite(n) ? n : 0; };
+  const byDate = {};
+  for(let r=1;r<wsData.length;r++){
+    const row = wsData[r];
+    if(!row || row.length===0) continue;
+    const rawDate = row[idx['Date']];
+    if(rawDate===undefined || rawDate==='') continue;
+    const dateStr = excelDateToISO(rawDate);
+    if(!dateStr) continue;
+    if(!byDate[dateStr]) byDate[dateStr] = {date:dateStr, localKg:0, importedKg:0, rebondedKg:0, memoryKg:0, binderKg:0, blockTotalKg:0, wastageKg:0, rows:0, skuRolls:{}};
+    const agg = byDate[dateStr];
+    const imported = num(row,'Imported Foam Scrap'), local = num(row,'Local Foam Scrap'), rebonded = num(row,'Rebonded Foam Scrap'),
+          memory = num(row,'Memory Foam Scrap'), binder = num(row,'Hard Binder 1519')+num(row,'Soft Binder 1513')+num(row,'Soft Binder 1026');
+    agg.importedKg += imported; agg.localKg += local; agg.rebondedKg += rebonded; agg.memoryKg += memory; agg.binderKg += binder;
+    agg.blockTotalKg += imported+local+rebonded+memory+binder;
+    agg.wastageKg += num(row,'Total wastage (edge trimming)') + num(row,'Wastage (Peeling)');
+    agg.rows += 1;
+    const skuName = normHeader(row[idx['Product SKU']]);
+    const rolls = num(row,'Roll Nos');
+    if(skuName){ agg.skuRolls[skuName] = (agg.skuRolls[skuName]||0) + rolls; }
+  }
+  return byDate;
+}
+
+async function handleUnderlayExcelFile(file){
+  if(!file) return;
+  const previewEl = document.getElementById('underlayExcelImportPreview');
+  previewEl.innerHTML = '<span class="loading-note">Reading file...</span>';
+  try{
+    if(typeof XLSX === 'undefined') throw new Error('Excel reader did not load — check your internet connection and refresh the page.');
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const sheetName = wb.SheetNames.find(n=>/round.*block/i.test(n)) || wb.SheetNames.find(n=>/underlay/i.test(n));
+    if(!sheetName) throw new Error('No "Round Block data" tab found in this file.');
+    const ws = wb.Sheets[sheetName];
+    const wsData = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
+    const byDate = aggregateUnderlayExcelRows(wsData);
+    const dates = Object.keys(byDate).sort();
+    if(dates.length===0){ previewEl.innerHTML = '<div class="status-msg err">No usable dated rows found in "'+sheetName+'".</div>'; return; }
+    EXCEL_UNDERLAY_DATA = byDate;
+    EXCEL_UNDERLAY_LABOR_ELEC = parseLaborElecTab(wb);
+    const currentDate = document.getElementById('entryDate').value;
+    const defaultDate = byDate[currentDate] ? currentDate : dates[dates.length-1];
+    renderUnderlayExcelImportPreview(dates, defaultDate);
+  }catch(e){
+    previewEl.innerHTML = '<div class="status-msg err">Could not read that file: '+(e.message||e)+'</div>';
+  }
+}
+
+function renderUnderlayExcelImportPreview(dates, selectedDate){
+  const previewEl = document.getElementById('underlayExcelImportPreview');
+  const a = EXCEL_UNDERLAY_DATA[selectedDate];
+  const opts = dates.map(d=>`<option value="${d}" ${d===selectedDate?'selected':''}>${d} (${EXCEL_UNDERLAY_DATA[d].rows} blocks)</option>`).join('');
+  const skuNames = Object.keys(a.skuRolls);
+  const skuRows = skuNames.map(name=>{
+    const match = matchMasterSku(name);
+    const rolls = a.skuRolls[name];
+    return `<tr>
+      <td>${name}</td>
+      <td style="font-family:var(--f-mono);">${rolls}</td>
+      <td>${match ? '<span style="color:var(--good);">Matched — '+match.name+'</span>' : '<span style="color:var(--bad);">No match in SKU master</span>'}</td>
+    </tr>`;
+  }).join('');
+  const memoryNote = a.memoryKg>0 ? `<div class="note-box" style="border-color:var(--bad);">Memory Foam Scrap: ${fmtKg(a.memoryKg)} found but there's no matching raw material in Settings — it's included in Block Total (physical weight) but not in any raw material row, so it won't be costed. Add a "Memory Foam" material in Settings if you want it tracked.</div>` : '';
+  previewEl.innerHTML = `
+    <div class="field" style="max-width:320px;">
+      <label>Date to import <span class="unit">(${dates.length} found in file)</span></label>
+      <select onchange="renderUnderlayExcelImportPreview(${JSON.stringify(dates).replace(/"/g,'&quot;')}, this.value)">${opts}</select>
+    </div>
+    <div class="preview-strip" style="margin-top:10px;">
+      <div class="preview-item"><span class="l">Local Foam Scrap</span><span class="v">${fmtKg(a.localKg)}</span></div>
+      <div class="preview-item"><span class="l">Imported Foam Scrap</span><span class="v">${fmtKg(a.importedKg)}</span></div>
+      <div class="preview-item"><span class="l">Rebonded Foam</span><span class="v">${fmtKg(a.rebondedKg)}</span></div>
+      <div class="preview-item"><span class="l">Binder / Adhesive</span><span class="v">${fmtKg(a.binderKg)}</span></div>
+      <div class="preview-item"><span class="l">Block total (raw input)</span><span class="v steel">${fmtKg(a.blockTotalKg)}</span></div>
+      <div class="preview-item"><span class="l">Total wastage</span><span class="v">${fmtKg(a.wastageKg)} <span style="color:var(--muted-dk);">(edge trim + peeling)</span></span></div>
+    </div>
+    ${memoryNote}
+    ${laborElecPreviewHTML(EXCEL_UNDERLAY_LABOR_ELEC)}
+    <div class="hairline"></div>
+    <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">SKU roll counts found</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Product SKU (from Excel)</th><th>Rolls</th><th>Match in SKU master</th></tr></thead>
+        <tbody>${skuRows || '<tr><td colspan="3" class="batch-empty">No SKU rows found for this date.</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="applyUnderlayExcelImport('${selectedDate}')">Import this date into Daily Log</button>
+      <button class="btn" onclick="document.getElementById('underlayExcelImportPreview').innerHTML=''; EXCEL_UNDERLAY_DATA=null; EXCEL_UNDERLAY_LABOR_ELEC=null; document.getElementById('underlayExcelFile').value='';">Cancel</button>
+    </div>
+    <div class="note-box">This fills Local/Imported/Rebonded/Binder quantities, Cylindrical blocks for Underlay, Wastage, labor/electricity for all four stages (if found), and adds/updates one roll SKU row per matched SKU with its roll count — weight/roll and front/back/bag costs auto-fill from the SKU master, same as picking it manually. Unmatched SKUs are skipped; add them to the SKU master first, then re-import. Nothing else on ${selectedDate} is touched, and nothing saves until you click "Save daily log" below.</div>
+  `;
+}
+
+function applyUnderlayExcelImport(dateStr){
+  const a = EXCEL_UNDERLAY_DATA && EXCEL_UNDERLAY_DATA[dateStr];
+  if(!a) return;
+
+  if(document.getElementById('entryDate').value !== dateStr){
+    document.getElementById('entryDate').value = dateStr;
+    fillEntryForm(ENTRIES[dateStr] || blankEntry(dateStr));
+    setExistingEntryControlsVisible(!!ENTRIES[dateStr]);
+  }
+
+  function setMaterialQty(nameRegex, qty){
+    const mat = RAW_MATERIAL_MASTER.find(m=>nameRegex.test(m.name||''));
+    if(qty<=0) return {matched: !!mat};
+    if(!mat) return {matched:false};
+    let row = CURRENT_UNDERLAY_RAWMATS.find(r=>r.materialId===mat.id);
+    if(!row){ row = {id:newBatchId(), materialId:mat.id, materialName:mat.name, qtyKg:0}; CURRENT_UNDERLAY_RAWMATS.push(row); }
+    row.qtyKg = Number(qty.toFixed(2));
+    return {matched:true};
+  }
+  const matResults = [
+    ['Local Foam Scrap', setMaterialQty(/local/i, a.localKg)],
+    ['Imported Foam Scrap', setMaterialQty(/import/i, a.importedKg)],
+    ['Rebonded Foam', setMaterialQty(/rebond/i, a.rebondedKg)],
+    ['Binder / Adhesive', setMaterialQty(/binder/i, a.binderKg)]
+  ];
+
+  document.getElementById('s_underlayBlocksKg').value = Number(a.blockTotalKg.toFixed(2));
+  document.getElementById('u_wastageKg').value = Number(a.wastageKg.toFixed(2));
+  applyLaborElecFields(EXCEL_UNDERLAY_LABOR_ELEC);
+
+  const unmatchedSkus = [];
+  Object.keys(a.skuRolls).forEach(name=>{
+    const sku = matchMasterSku(name);
+    if(!sku){ unmatchedSkus.push(name); return; }
+    const rolls = a.skuRolls[name];
+    let batch = CURRENT_UNDERLAY_BATCHES.find(b=>b.skuId===sku.id);
+    if(!batch){
+      batch = {id:newBatchId(), skuId:sku.id, weightPerRoll:0, frontCostPerRoll:0, backCostPerRoll:0, bagCostPerRoll:0, rollCount:0, outputKgOverride:null};
+      CURRENT_UNDERLAY_BATCHES.push(batch);
+    }
+    batch.skuId = sku.id;
+    const costs = computeSkuCosts(sku, PRICING);
+    batch.weightPerRoll = Number(costs.weightPerRoll.toFixed(3));
+    batch.frontCostPerRoll = Number(costs.frontCostPerRoll.toFixed(2));
+    batch.backCostPerRoll = Number(costs.backCostPerRoll.toFixed(2));
+    batch.bagCostPerRoll = Number(costs.bagCostPerRoll.toFixed(2));
+    batch.rollCount = Number(rolls.toFixed(2));
+  });
+
+  refreshRawMaterialDisplays();
+  renderUnderlayBatchRows();
+  updateLivePreview();
+
+  const unmatchedMats = matResults.filter(([,r])=>r && r.matched===false).map(([n])=>n);
+  const statusEl = document.getElementById('entryStatus');
+  document.getElementById('underlayExcelImportPreview').innerHTML = '';
+  document.getElementById('underlayExcelFile').value = '';
+  EXCEL_UNDERLAY_DATA = null;
+  EXCEL_UNDERLAY_LABOR_ELEC = null;
+
+  const problems = [];
+  if(unmatchedMats.length) problems.push('raw material(s) not found: '+unmatchedMats.join(', '));
+  if(unmatchedSkus.length) problems.push('SKU(s) not in master: '+unmatchedSkus.join(', '));
+  if(problems.length){
+    statusEl.textContent = 'Imported for '+dateStr+', but '+problems.join('; ')+'. Fix in Settings and re-import, or enter manually. Review before saving.';
+    statusEl.className = 'status-msg err';
+  } else {
+    statusEl.textContent = 'Imported round block data for '+dateStr+'. Review the values below, then click Save daily log.';
     statusEl.className = 'status-msg';
   }
 }
