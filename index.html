@@ -1377,13 +1377,14 @@ function parseLaborElecTab(wb){
   if(!rows || rows.length<2) return null;
 
   // read columns by header name rather than fixed position, so an added/reordered
-  // column (like "Total glue kg") can't silently break labor/electricity parsing
+  // column can't silently break parsing. "Total kg" is a generic quantity column
+  // shared by whichever named rows use it (Glue, Wood, ...) — routed by row label below.
   const headerRow = rows[0].map(normHeader);
   const idx = {};
   headerRow.forEach((h,i)=>{ if(h && !(h in idx)) idx[h]=i; });
   const laborCol = Object.keys(idx).find(k=>/labor|labour/i.test(k));
   const elecCol = Object.keys(idx).find(k=>/electric/i.test(k));
-  const glueCol = Object.keys(idx).find(k=>/glue/i.test(k));
+  const qtyCol = Object.keys(idx).find(k=>/total.*kg/i.test(k)) || Object.keys(idx).find(k=>/\bkg\b/i.test(k) && !/electric/i.test(k));
 
   const result = {};
   for(let r=1;r<rows.length;r++){
@@ -1391,12 +1392,13 @@ function parseLaborElecTab(wb){
     const stage = normHeader(row[0]);
     const v1 = laborCol ? parseFloat(row[idx[laborCol]]) : NaN;
     const v2 = elecCol ? parseFloat(row[idx[elecCol]]) : NaN;
-    const v3 = glueCol ? parseFloat(row[idx[glueCol]]) : NaN;
+    const v3 = qtyCol ? parseFloat(row[idx[qtyCol]]) : NaN;
     if(/foaming/i.test(stage)){ if(isFinite(v1)) result.foamingLabor=v1; if(isFinite(v2)) result.foamingElec=v2; }
     else if(/cutting/i.test(stage)){ if(isFinite(v1)) result.cuttingLabor=v1; if(isFinite(v2)) result.cuttingElec=v2; }
     else if(/peeling/i.test(stage)){ if(isFinite(v1)) result.peelingLabor=v1; if(isFinite(v2)) result.peelingElec=v2; }
     else if(/lamination/i.test(stage)){ if(isFinite(v1)) result.laminationLabor=v1; if(isFinite(v2)) result.laminationElec=v2; }
-    if(isFinite(v3)) result.glueKg = (result.glueKg||0) + v3; // sum, in case glue is split across more than one row
+    if(/glue/i.test(stage) && isFinite(v3)) result.glueKg = (result.glueKg||0) + v3;
+    if(/wood/i.test(stage) && isFinite(v3)) result.woodKg = (result.woodKg||0) + v3;
   }
   return Object.keys(result).length ? result : null;
 }
@@ -1408,19 +1410,21 @@ function applyLaborElecFields(le){
   set('u_peelLaborCount', le.peelingLabor); set('u_peelElecUnits', le.peelingElec);
   set('u_lamLaborCount', le.laminationLabor); set('u_lamElecUnits', le.laminationElec);
   set('u_totalGlueKg', le.glueKg);
+  set('s_woodKg', le.woodKg);
 }
 function laborElecPreviewHTML(le){
   if(!le) return '';
   const row = (l,e) => (l!=null||e!=null) ? `${l!=null?l:'—'} people / ${e!=null?e:'—'} kWh` : '—';
   return `
     <div class="hairline"></div>
-    <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">Labor, electricity &amp; glue (from "Labour and electricity status" tab)</p>
+    <p style="font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">Labor, electricity, glue &amp; wood (from "Labour and electricity status" tab)</p>
     <div class="preview-strip" style="margin-top:0;">
       <div class="preview-item"><span class="l">Foaming</span><span class="v">${row(le.foamingLabor, le.foamingElec)}</span></div>
       <div class="preview-item"><span class="l">Cutting</span><span class="v">${row(le.cuttingLabor, le.cuttingElec)}</span></div>
       <div class="preview-item"><span class="l">Peeling</span><span class="v">${row(le.peelingLabor, le.peelingElec)}</span></div>
       <div class="preview-item"><span class="l">Lamination</span><span class="v">${row(le.laminationLabor, le.laminationElec)}</span></div>
       ${le.glueKg!=null ? `<div class="preview-item"><span class="l">Glue (total)</span><span class="v">${fmtKg(le.glueKg)}</span></div>` : ''}
+      ${le.woodKg!=null ? `<div class="preview-item"><span class="l">Wood (total)</span><span class="v">${fmtKg(le.woodKg)}</span></div>` : ''}
     </div>`;
 }
 function matchMasterSku(name){
