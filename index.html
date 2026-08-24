@@ -1481,6 +1481,39 @@ function aggregateSheetExcelRows(wsData){
   return byDate;
 }
 
+function aggregateUnderlayExcelRows(wsData){
+  if(!wsData || wsData.length<2) throw new Error('No data rows found.');
+  const headerRow = wsData[0].map(normHeader);
+  const idx = {};
+  headerRow.forEach((h,i)=>{ if(h && !(h in idx)) idx[h]=i; });
+  const need = ['Date','Roll Nos','Product SKU','Imported Foam Scrap','Local Foam Scrap','Rebonded Foam Scrap','Memory Foam Scrap','Hard Binder 1519','Soft Binder 1513','Soft Binder 1026','Total wastage (edge trimming)','Wastage (Peeling)'];
+  const missing = need.filter(k=>!(k in idx));
+  if(missing.length) throw new Error('Missing expected column(s): '+missing.join(', ')+'. Check this is the "Round Block data" tab with unchanged headers.');
+
+  const num = (row,key) => { const v = row[idx[key]]; const n = parseFloat(v); return isFinite(n) ? n : 0; };
+  const byDate = {};
+  for(let r=1;r<wsData.length;r++){
+    const row = wsData[r];
+    if(!row || row.length===0) continue;
+    const rawDate = row[idx['Date']];
+    if(rawDate===undefined || rawDate==='') continue;
+    const dateStr = excelDateToISO(rawDate);
+    if(!dateStr) continue;
+    if(!byDate[dateStr]) byDate[dateStr] = {date:dateStr, localKg:0, importedKg:0, rebondedKg:0, memoryKg:0, binderKg:0, blockTotalKg:0, wastageKg:0, rows:0, skuRolls:{}};
+    const agg = byDate[dateStr];
+    const imported = num(row,'Imported Foam Scrap'), local = num(row,'Local Foam Scrap'), rebonded = num(row,'Rebonded Foam Scrap'),
+          memory = num(row,'Memory Foam Scrap'), binder = num(row,'Hard Binder 1519')+num(row,'Soft Binder 1513')+num(row,'Soft Binder 1026');
+    agg.importedKg += imported; agg.localKg += local; agg.rebondedKg += rebonded; agg.memoryKg += memory; agg.binderKg += binder;
+    agg.blockTotalKg += imported+local+rebonded+memory+binder;
+    agg.wastageKg += num(row,'Total wastage (edge trimming)') + num(row,'Wastage (Peeling)');
+    agg.rows += 1;
+    const skuName = normHeader(row[idx['Product SKU']]);
+    const rolls = num(row,'Roll Nos');
+    if(skuName){ agg.skuRolls[skuName] = (agg.skuRolls[skuName]||0) + rolls; }
+  }
+  return byDate;
+}
+
 async function handleCombinedExcelFile(file){
   if(!file) return;
   const previewEl = document.getElementById('combinedExcelImportPreview');
