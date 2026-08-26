@@ -111,6 +111,13 @@
   .field textarea{resize:vertical;min-height:38px;font-family:var(--f-body);font-size:13px;}
   .field-span2{grid-column:span 2;}
 
+  .rate-field{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;}
+  .rate-current-val{font-family:var(--f-mono);font-size:18px;font-weight:600;color:var(--text);}
+  .rate-current-since{font-family:var(--f-mono);font-size:10.5px;color:var(--muted-dk);margin-left:6px;}
+  .rate-field .btn{margin-top:8px;}
+  .rate-history-panel{margin-top:8px;}
+  .rate-history-panel table th, .rate-history-panel table td{font-size:11.5px;padding:6px 8px;}
+
   .btn{font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--border-lt);
        background:var(--panel3);color:var(--text);padding:10px 18px;border-radius:6px;cursor:pointer;transition:border-color .15s;}
   .btn:hover{border-color:var(--amber);}
@@ -607,9 +614,8 @@
   <section class="view" id="view-settings">
     <div class="panel">
       <h2>Electricity, wood &amp; currency rates</h2>
-      <div class="field-grid">
-        <div class="field"><label>Electricity rate <span class="unit">(₹/unit)</span></label><input type="number" id="set_elecRate" min="0" step="any"></div>
-        <div class="field"><label>Wood rate <span class="unit">(₹/kg)</span></label><input type="number" id="set_woodRate" min="0" step="any"></div>
+      <div class="field-grid" id="rateFieldsGrid_elec"></div>
+      <div class="field-grid" style="margin-top:12px;">
         <div class="field">
           <label>GBP exchange rate <span class="unit">(₹ per £)</span></label>
           <div style="display:flex;gap:8px;">
@@ -619,29 +625,18 @@
         </div>
       </div>
       <div class="status-msg" id="gbpRateStatus"></div>
-      <div class="note-box">The GBP rate is only used to show a £ figure alongside ₹ — it never affects the actual ₹ costing. Each day's entry locks in whatever this rate was when you saved it, so old dates' £ figures stay fixed even if you update the rate later; only new saves pick up a changed rate. "Refresh live rate" pulls the current rate from a public exchange service — review it and click <strong>Save settings</strong> to apply it.</div>
+      <div class="note-box">The GBP rate is only used to show a £ figure alongside ₹ — it never affects the actual ₹ costing. Each day's entry locks in whatever this rate was when you saved it, so old dates' £ figures stay fixed even if you update the rate later; only new saves pick up a changed rate. "Refresh live rate" pulls the current rate from a public exchange service — review it and click <strong>Save settings</strong> to apply it.<br><br>Electricity and Wood rates below are effective-dated — add a new rate with the date it takes effect, and every day is costed using whatever rate was actually in force on that date, past or future. No existing data is retroactively affected unless you edit a past rate's value directly.</div>
     </div>
 
     <div class="panel">
       <h2>Labor rates <span class="accent">&mdash; ₹ per person, applied to the headcount entered in Daily Log</span></h2>
-      <div class="field-grid">
-        <div class="field"><label>Foaming stage <span class="unit">(₹/person)</span></label><input type="number" id="set_laborRateFoaming" min="0" step="any"></div>
-        <div class="field"><label>Cutting stage <span class="unit">(₹/person)</span></label><input type="number" id="set_laborRateCutting" min="0" step="any"></div>
-        <div class="field"><label>Peeling stage <span class="unit">(₹/person)</span></label><input type="number" id="set_laborRatePeeling" min="0" step="any"></div>
-        <div class="field"><label>Lamination + packing stage <span class="unit">(₹/person)</span></label><input type="number" id="set_laborRateLamination" min="0" step="any"></div>
-      </div>
-      <div class="note-box">Daily Log now takes a headcount per stage instead of a total ₹ figure — the app multiplies by these rates. Update a rate here if wages change; it applies to every entry saved from then on, same as the other rates.</div>
+      <div class="field-grid" id="rateFieldsGrid_labor"></div>
+      <div class="note-box">Daily Log takes a headcount per stage instead of a total ₹ figure — the app multiplies by whichever rate was effective on that entry's date. Add a new rate below with the date wages actually changed — days before that date keep using the old rate, automatically.</div>
     </div>
     <div class="panel">
       <h2>Monthly overheads <span class="accent">&mdash; spread across production days automatically</span></h2>
-      <div class="field-grid">
-        <div class="field"><label>Rent <span class="unit">(₹/month)</span></label><input type="number" id="set_rent" min="0" step="any"></div>
-        <div class="field"><label>Admin salaries <span class="unit">(₹/month)</span></label><input type="number" id="set_admin" min="0" step="any"></div>
-        <div class="field"><label>Depreciation <span class="unit">(₹/month)</span></label><input type="number" id="set_dep" min="0" step="any"></div>
-        <div class="field"><label>Other fixed costs <span class="unit">(₹/month)</span></label><input type="number" id="set_other" min="0" step="any"></div>
-        <div class="field"><label>Production days / month</label><input type="number" id="set_prodDays" min="1" step="1"></div>
-      </div>
-      <div class="note-box">Allocation basis: shared foaming labor, electricity, and daily overhead split between Sheets and Underlay by weight of blocks each line drew from foaming — raw material is charged directly per line, not allocated. Within a line, the allocated share is spread evenly per kg across every SKU produced that day. Say the word if you'd rather allocate by machine-hours per line instead.</div>
+      <div class="field-grid" id="rateFieldsGrid_overhead"></div>
+      <div class="note-box">Allocation basis: shared foaming labor, electricity, and daily overhead split between Sheets and Underlay by weight of blocks each line drew from foaming — raw material is charged directly per line, not allocated. Within a line, the allocated share is spread evenly per kg across every SKU produced that day. These are also effective-dated — add a new figure with the date it takes effect (e.g. a rent increase from a specific month) and each day is costed using whatever was in force then.</div>
     </div>
 
     <div class="panel">
@@ -662,24 +657,10 @@
 
     <div class="panel">
       <h2>Roll lamination &amp; packing rates</h2>
-      <div class="field-grid">
-        <div class="field"><label>Nonwoven, plain <span class="unit">(₹/kg)</span></label><input type="number" id="p_nonwovenPlain" min="0" step="any"></div>
-        <div class="field"><label>Nonwoven, printed <span class="unit">(₹/kg)</span></label><input type="number" id="p_nonwovenPrinted" min="0" step="any"></div>
-        <div class="field"><label>Nonwoven width <span class="unit">(m)</span></label><input type="number" id="p_nonwovenWidthM" min="0" step="any"></div>
-        <div class="field"><label>Nonwoven GSM <span class="unit">(g/m²)</span></label><input type="number" id="p_nonwovenGSM" min="0" step="any"></div>
-        <div class="field"><label>Paper, brown <span class="unit">(₹/linear m)</span></label><input type="number" id="p_paperBrown" min="0" step="any"></div>
-        <div class="field"><label>Paper, white <span class="unit">(₹/linear m)</span></label><input type="number" id="p_paperWhite" min="0" step="any"></div>
-        <div class="field"><label>Wilkies Brown Paper <span class="unit">(₹/linear m)</span></label><input type="number" id="p_wilkiesBrownPaper" min="0" step="any"></div>
-        <div class="field"><label>Wilkies White Paper <span class="unit">(₹/linear m)</span></label><input type="number" id="p_wilkiesWhitePaper" min="0" step="any"></div>
-        <div class="field"><label>PE film <span class="unit">(₹/linear m)</span></label><input type="number" id="p_peFilm" min="0" step="any"></div>
-        <div class="field"><label>Silver foil <span class="unit">(₹/linear m)</span></label><input type="number" id="p_silverFoil" min="0" step="any"></div>
-        <div class="field"><label>Printed bag <span class="unit">(₹/bag)</span></label><input type="number" id="p_printedBag" min="0" step="any"></div>
-        <div class="field"><label>Clear / color bag <span class="unit">(₹/bag)</span></label><input type="number" id="p_otherBag" min="0" step="any"></div>
-        <div class="field"><label>Lamination glue <span class="unit">(₹/kg)</span></label><input type="number" id="p_glueRate" min="0" step="any"></div>
-
-      </div>
+      <div class="field-grid" id="rateFieldsGrid_pricing"></div>
       <div class="btn-row"><button class="btn btn-primary" onclick="savePricing()">Save rates</button></div>
       <div class="status-msg" id="pricingStatus"></div>
+      <div class="note-box">These rates are effective-dated. When you pick a roll SKU in Daily Log (or import via Excel), the app looks up whichever rate was in force on that entry's date — not today's live rate — so backdating an old day's log always uses the pricing that was actually correct then. Already-saved batches keep their locked-in per-roll cost regardless; only a new selection re-derives from these rates.</div>
     </div>
 
     <div class="panel">
@@ -722,8 +703,171 @@
 </div>
 
 <script>
-const DEFAULT_SETTINGS = { elecRate: 8, woodRate: 0, rent: 150000, admin: 100000, dep: 50000, other: 30000, prodDays: 26, gbpRate: 105,
-  laborRateFoaming: 600, laborRateCutting: 600, laborRatePeeling: 600, laborRateLamination: 600 };
+/* ---------------- effective-dated rates — core engine ---------------- */
+// A "history" is an array of {from:'YYYY-MM-DD', value:number}, always kept sorted ascending by `from`.
+// rateAt() finds whichever value was active on a given date — the most recent entry on or before it.
+const RATE_SENTINEL_DATE = '2000-01-01'; // "since the beginning" — anything dated before real usage of this app
+function sortHistory(history){
+  return [...history].sort((a,b)=> a.from<b.from?-1:(a.from>b.from?1:0));
+}
+function rateAt(history, dateStr){
+  if(!Array.isArray(history) || history.length===0) return 0;
+  const d = dateStr || todayStr();
+  const sorted = sortHistory(history);
+  let active = sorted[0].value;
+  for(const h of sorted){ if(h.from <= d) active = h.value; else break; }
+  return Number(active)||0;
+}
+function migrateToHistory(value){
+  if(Array.isArray(value) && value.length){
+    return sortHistory(value.map(h=>({from: String(h.from||RATE_SENTINEL_DATE), value: Number(h.value)||0})));
+  }
+  return [{from: RATE_SENTINEL_DATE, value: Number(value)||0}];
+}
+const HISTORY_SETTINGS_KEYS = ['elecRate','woodRate','rent','admin','dep','other','prodDays','laborRateFoaming','laborRateCutting','laborRatePeeling','laborRateLamination'];
+const HISTORY_PRICING_KEYS = ['nonwovenPlain','nonwovenPrinted','nonwovenWidthM','nonwovenGSM','paperBrown','paperWhite','wilkiesBrownPaper','wilkiesWhitePaper','peFilm','silverFoil','printedBag','otherBag','glueRate'];
+function migrateSettingsHistory(s){
+  const out = {...s};
+  HISTORY_SETTINGS_KEYS.forEach(k=>{ out[k] = migrateToHistory(out[k]); });
+  return out;
+}
+function migratePricingHistory(p){
+  const out = {...p};
+  HISTORY_PRICING_KEYS.forEach(k=>{ out[k] = migrateToHistory(out[k]); });
+  return out;
+}
+function pricingAt(dateStr){
+  const out = {};
+  HISTORY_PRICING_KEYS.forEach(k=>{ out[k] = rateAt(PRICING[k], dateStr); });
+  return out;
+}
+
+/* ---------------- rate-history widget (Settings tab UI) ---------------- */
+const RATE_FIELDS = [
+  {key:'elecRate', store:'settings', label:'Electricity rate', unit:'₹/unit'},
+  {key:'woodRate', store:'settings', label:'Wood rate', unit:'₹/kg'},
+  {key:'laborRateFoaming', store:'settings', label:'Foaming stage', unit:'₹/person'},
+  {key:'laborRateCutting', store:'settings', label:'Cutting stage', unit:'₹/person'},
+  {key:'laborRatePeeling', store:'settings', label:'Peeling stage', unit:'₹/person'},
+  {key:'laborRateLamination', store:'settings', label:'Lamination + packing stage', unit:'₹/person'},
+  {key:'rent', store:'settings', label:'Rent', unit:'₹/month'},
+  {key:'admin', store:'settings', label:'Admin salaries', unit:'₹/month'},
+  {key:'dep', store:'settings', label:'Depreciation', unit:'₹/month'},
+  {key:'other', store:'settings', label:'Other fixed costs', unit:'₹/month'},
+  {key:'prodDays', store:'settings', label:'Production days / month', unit:''},
+  {key:'nonwovenPlain', store:'pricing', label:'Nonwoven, plain', unit:'₹/kg'},
+  {key:'nonwovenPrinted', store:'pricing', label:'Nonwoven, printed', unit:'₹/kg'},
+  {key:'nonwovenWidthM', store:'pricing', label:'Nonwoven width', unit:'m'},
+  {key:'nonwovenGSM', store:'pricing', label:'Nonwoven GSM', unit:'g/m²'},
+  {key:'paperBrown', store:'pricing', label:'Paper, brown', unit:'₹/linear m'},
+  {key:'paperWhite', store:'pricing', label:'Paper, white', unit:'₹/linear m'},
+  {key:'wilkiesBrownPaper', store:'pricing', label:'Wilkies Brown Paper', unit:'₹/linear m'},
+  {key:'wilkiesWhitePaper', store:'pricing', label:'Wilkies White Paper', unit:'₹/linear m'},
+  {key:'peFilm', store:'pricing', label:'PE film', unit:'₹/linear m'},
+  {key:'silverFoil', store:'pricing', label:'Silver foil', unit:'₹/linear m'},
+  {key:'printedBag', store:'pricing', label:'Printed bag', unit:'₹/bag'},
+  {key:'otherBag', store:'pricing', label:'Clear / color bag', unit:'₹/bag'},
+  {key:'glueRate', store:'pricing', label:'Lamination glue', unit:'₹/kg'}
+];
+function getRateStoreObj(store){ return store==='settings' ? SETTINGS : PRICING; }
+function rateFieldHTML(f){
+  return `<div class="field rate-field">
+    <label>${f.label}${f.unit ? ' <span class="unit">('+f.unit+')</span>' : ''}</label>
+    <div class="rate-current" id="rfcur_${f.key}"></div>
+    <button type="button" class="btn btn-sm" onclick="toggleRateHistory('${f.key}')" id="rftoggle_${f.key}">Rate history</button>
+    <div class="rate-history-panel" id="rfpanel_${f.key}" style="display:none;"></div>
+  </div>`;
+}
+function renderRateFieldCurrent(key){
+  const f = RATE_FIELDS.find(x=>x.key===key);
+  const history = sortHistory(getRateStoreObj(f.store)[key]);
+  const today = todayStr();
+  const val = rateAt(history, today);
+  let activeFrom = history[0].from;
+  for(const h of history){ if(h.from<=today) activeFrom = h.from; else break; }
+  const el = document.getElementById('rfcur_'+key);
+  if(el) el.innerHTML = `<span class="rate-current-val">${val}</span> <span class="rate-current-since">effective from ${activeFrom}${history.length>1?' &middot; '+history.length+' rate changes on record':''}</span>`;
+}
+function renderRateHistoryPanel(key){
+  const f = RATE_FIELDS.find(x=>x.key===key);
+  const history = sortHistory(getRateStoreObj(f.store)[key]);
+  const rows = history.map((h,i)=>`<tr>
+    <td>${h.from}</td><td>${h.value}</td>
+    <td>${history.length>1 ? `<button class="batch-rm" onclick="removeRateHistoryEntry('${key}',${i})">Remove</button>` : '<span class="muted">Only rate on record</span>'}</td>
+  </tr>`).join('');
+  const panel = document.getElementById('rfpanel_'+key);
+  if(!panel) return;
+  panel.innerHTML = `
+    <div class="batch-tbl-wrap" style="margin-top:8px;">
+      <table class="batch-tbl"><thead><tr><th>Effective from</th><th>Value</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    <div class="btn-row" style="margin-top:8px;">
+      <input type="date" id="rfnewdate_${key}" style="max-width:160px;">
+      <input type="number" step="any" id="rfnewvalue_${key}" placeholder="New value" style="max-width:140px;">
+      <button type="button" class="btn btn-sm" onclick="addRateHistoryEntry('${key}')">Add rate change</button>
+    </div>`;
+}
+function toggleRateHistory(key){
+  const panel = document.getElementById('rfpanel_'+key);
+  const willShow = panel.style.display === 'none';
+  if(willShow) renderRateHistoryPanel(key);
+  panel.style.display = willShow ? 'block' : 'none';
+  document.getElementById('rftoggle_'+key).textContent = willShow ? 'Hide rate history' : 'Rate history';
+}
+function addRateHistoryEntry(key){
+  const f = RATE_FIELDS.find(x=>x.key===key);
+  const dateVal = document.getElementById('rfnewdate_'+key).value;
+  const numVal = parseFloat(document.getElementById('rfnewvalue_'+key).value);
+  if(!dateVal){ alert('Pick the date this rate change takes effect from.'); return; }
+  if(!isFinite(numVal)){ alert('Enter a value for the new rate.'); return; }
+  const obj = getRateStoreObj(f.store);
+  let history = sortHistory(obj[key]);
+  const existingIdx = history.findIndex(h=>h.from===dateVal);
+  if(existingIdx>=0) history[existingIdx] = {from:dateVal, value:numVal};
+  else history.push({from:dateVal, value:numVal});
+  obj[key] = sortHistory(history);
+  renderRateFieldCurrent(key);
+  renderRateHistoryPanel(key);
+  document.getElementById('rfnewdate_'+key).value = '';
+  document.getElementById('rfnewvalue_'+key).value = '';
+  renderDashboard(); updateLivePreview(); refreshRawMaterialDisplays();
+}
+function removeRateHistoryEntry(key, idx){
+  const f = RATE_FIELDS.find(x=>x.key===key);
+  const obj = getRateStoreObj(f.store);
+  let history = sortHistory(obj[key]);
+  if(history.length<=1) return;
+  history.splice(idx,1);
+  obj[key] = history;
+  renderRateFieldCurrent(key);
+  renderRateHistoryPanel(key);
+  renderDashboard(); updateLivePreview(); refreshRawMaterialDisplays();
+}
+function renderAllRateFieldsCurrent(){
+  RATE_FIELDS.forEach(f=>renderRateFieldCurrent(f.key));
+}
+function renderRateFieldContainers(){
+  const groups = {
+    elec: ['elecRate','woodRate'],
+    labor: ['laborRateFoaming','laborRateCutting','laborRatePeeling','laborRateLamination'],
+    overhead: ['rent','admin','dep','other','prodDays'],
+    pricing: ['nonwovenPlain','nonwovenPrinted','nonwovenWidthM','nonwovenGSM','paperBrown','paperWhite','wilkiesBrownPaper','wilkiesWhitePaper','peFilm','silverFoil','printedBag','otherBag','glueRate']
+  };
+  Object.keys(groups).forEach(g=>{
+    const container = document.getElementById('rateFieldsGrid_'+g);
+    if(!container) return;
+    container.innerHTML = groups[g].map(k=>rateFieldHTML(RATE_FIELDS.find(f=>f.key===k))).join('');
+  });
+}
+
+const DEFAULT_SETTINGS = {
+  elecRate: [{from:RATE_SENTINEL_DATE, value:8}], woodRate: [{from:RATE_SENTINEL_DATE, value:0}],
+  rent: [{from:RATE_SENTINEL_DATE, value:150000}], admin: [{from:RATE_SENTINEL_DATE, value:100000}],
+  dep: [{from:RATE_SENTINEL_DATE, value:50000}], other: [{from:RATE_SENTINEL_DATE, value:30000}],
+  prodDays: [{from:RATE_SENTINEL_DATE, value:26}], gbpRate: 105,
+  laborRateFoaming: [{from:RATE_SENTINEL_DATE, value:600}], laborRateCutting: [{from:RATE_SENTINEL_DATE, value:600}],
+  laborRatePeeling: [{from:RATE_SENTINEL_DATE, value:600}], laborRateLamination: [{from:RATE_SENTINEL_DATE, value:600}]
+};
 let SETTINGS = {...DEFAULT_SETTINGS};
 let ENTRIES = {}; // dateStr -> entry object
 let batchIdCounter = 1;
@@ -731,9 +875,13 @@ function newBatchId(){ return 'b' + (batchIdCounter++) + '_' + Date.now().toStri
 
 /* ---------------- roll SKU master + pricing ---------------- */
 const DEFAULT_PRICING = {
-  nonwovenPlain:180, nonwovenPrinted:220, nonwovenWidthM:1.45, nonwovenGSM:25,
-  paperBrown:30, paperWhite:35, wilkiesBrownPaper:30, wilkiesWhitePaper:35, peFilm:25, silverFoil:20,
-  printedBag:50, otherBag:35, glueRate:250
+  nonwovenPlain:[{from:RATE_SENTINEL_DATE,value:180}], nonwovenPrinted:[{from:RATE_SENTINEL_DATE,value:220}],
+  nonwovenWidthM:[{from:RATE_SENTINEL_DATE,value:1.45}], nonwovenGSM:[{from:RATE_SENTINEL_DATE,value:25}],
+  paperBrown:[{from:RATE_SENTINEL_DATE,value:30}], paperWhite:[{from:RATE_SENTINEL_DATE,value:35}],
+  wilkiesBrownPaper:[{from:RATE_SENTINEL_DATE,value:30}], wilkiesWhitePaper:[{from:RATE_SENTINEL_DATE,value:35}],
+  peFilm:[{from:RATE_SENTINEL_DATE,value:25}], silverFoil:[{from:RATE_SENTINEL_DATE,value:20}],
+  printedBag:[{from:RATE_SENTINEL_DATE,value:50}], otherBag:[{from:RATE_SENTINEL_DATE,value:35}],
+  glueRate:[{from:RATE_SENTINEL_DATE,value:250}]
 };
 let PRICING = {...DEFAULT_PRICING};
 
@@ -951,8 +1099,8 @@ async function importAllData(file){
   try{
     const text = await file.text();
     const payload = JSON.parse(text);
-    if(payload.settings) SETTINGS = {...DEFAULT_SETTINGS, ...payload.settings};
-    if(payload.pricing) PRICING = {...DEFAULT_PRICING, ...payload.pricing};
+    if(payload.settings) SETTINGS = migrateSettingsHistory({...DEFAULT_SETTINGS, ...payload.settings});
+    if(payload.pricing) PRICING = migratePricingHistory({...DEFAULT_PRICING, ...payload.pricing});
     if(payload.masterSkus && Array.isArray(payload.masterSkus)) MASTER_SKUS = payload.masterSkus;
     if(payload.rawMaterialMaster && Array.isArray(payload.rawMaterialMaster)) RAW_MATERIAL_MASTER = payload.rawMaterialMaster;
     if(payload.entries) ENTRIES = payload.entries;
@@ -978,11 +1126,11 @@ async function importAllData(file){
 
 async function loadSettings(){
   const raw = await storageGet('settings');
-  if(raw){ try{ SETTINGS = {...DEFAULT_SETTINGS, ...JSON.parse(raw)}; }catch(e){} }
+  if(raw){ try{ SETTINGS = migrateSettingsHistory({...DEFAULT_SETTINGS, ...JSON.parse(raw)}); }catch(e){} }
 }
 async function loadPricing(){
   const raw = await storageGet('roll_pricing');
-  if(raw){ try{ PRICING = {...DEFAULT_PRICING, ...JSON.parse(raw)}; }catch(e){} }
+  if(raw){ try{ PRICING = migratePricingHistory({...DEFAULT_PRICING, ...JSON.parse(raw)}); }catch(e){} }
 }
 async function loadMasterSkus(){
   const raw = await storageGet('roll_master_skus');
@@ -1063,16 +1211,17 @@ function computeInventoryLedger(entriesMap, materialMaster){
 function computeDay(e, settings, materialRates, reclaimRate){
   materialRates = materialRates || {};
   reclaimRate = reclaimRate || 0;
-  const rate = settings.elecRate;
-  const sharedLabor = (e.s_laborCount||0) * (settings.laborRateFoaming||0);
+  const entryDate = e.date;
+  const rate = rateAt(settings.elecRate, entryDate);
+  const sharedLabor = (e.s_laborCount||0) * rateAt(settings.laborRateFoaming, entryDate);
   const sharedElec = e.s_elecUnits*rate;
-  const sharedOther = e.s_dieselCost + e.s_maintCost + (e.s_woodKg||0)*(settings.woodRate||0);
+  const sharedOther = e.s_dieselCost + e.s_maintCost + (e.s_woodKg||0)*rateAt(settings.woodRate, entryDate);
 
   const totalBlocks = e.s_sheetBlocksKg + e.s_underlayBlocksKg;
   const sheetRatio = totalBlocks>0 ? e.s_sheetBlocksKg/totalBlocks : 0;
   const underlayRatio = totalBlocks>0 ? e.s_underlayBlocksKg/totalBlocks : 0;
 
-  const dailyOverhead = (settings.rent+settings.admin+settings.dep+settings.other) / Math.max(settings.prodDays,1);
+  const dailyOverhead = (rateAt(settings.rent,entryDate)+rateAt(settings.admin,entryDate)+rateAt(settings.dep,entryDate)+rateAt(settings.other,entryDate)) / Math.max(rateAt(settings.prodDays,entryDate),1);
 
   const sheetRawMaterials = (e.sh_rawMaterials||[]).map(m=>{
     const resolved = materialRates[m.materialId];
@@ -1089,7 +1238,7 @@ function computeDay(e, settings, materialRates, reclaimRate){
 
   const sheetsPool = {
     raw: sheetRawNet,
-    labor: sharedLabor*sheetRatio + (e.sh_laborCount||0)*(settings.laborRateCutting||0),
+    labor: sharedLabor*sheetRatio + (e.sh_laborCount||0)*rateAt(settings.laborRateCutting, entryDate),
     elec: sharedElec*sheetRatio + e.sh_elecUnits*rate,
     other: sharedOther*sheetRatio,
     oh: dailyOverhead*sheetRatio
@@ -1143,7 +1292,7 @@ function computeDay(e, settings, materialRates, reclaimRate){
 
   const underlayPool = {
     raw: underlayRawNet,
-    labor: sharedLabor*underlayRatio + (e.u_peelLaborCount||0)*(settings.laborRatePeeling||0) + (e.u_lamLaborCount||0)*(settings.laborRateLamination||0),
+    labor: sharedLabor*underlayRatio + (e.u_peelLaborCount||0)*rateAt(settings.laborRatePeeling,entryDate) + (e.u_lamLaborCount||0)*rateAt(settings.laborRateLamination,entryDate),
     elec: sharedElec*underlayRatio + e.u_peelElecUnits*rate + e.u_lamElecUnits*rate,
     other: sharedOther*underlayRatio,
     oh: dailyOverhead*underlayRatio
@@ -1152,7 +1301,7 @@ function computeDay(e, settings, materialRates, reclaimRate){
   const underlayRatePerKg = totalUnderlayOut>0 ? underlayPoolTotal/totalUnderlayOut : 0;
 
   const totalGlueKg = Number(e.u_totalGlueKg)||0;
-  const glueRate = (e.u_glueRateUsed!=null ? e.u_glueRateUsed : PRICING.glueRate) || 0;
+  const glueRate = rateAt(PRICING.glueRate, entryDate);
   let consumTotal = 0;
   underlayBatches.forEach(b=>{
     b.glueKg = totalRolls>0 ? Number((totalGlueKg * (b.rollCount/totalRolls)).toFixed(3)) : 0;
@@ -1190,7 +1339,6 @@ function blankEntry(date){
   return {
     date,
     gbpRateUsed: (typeof SETTINGS!=='undefined' && SETTINGS.gbpRate) || DEFAULT_SETTINGS.gbpRate,
-    u_glueRateUsed: (typeof PRICING!=='undefined' && PRICING.glueRate) || DEFAULT_PRICING.glueRate,
     purchases:[],
     s_laborCount:0,s_elecUnits:0,s_dieselCost:0,s_maintCost:0,s_woodKg:0,
     s_sheetBlocksKg:0,s_underlayBlocksKg:0,
@@ -1366,6 +1514,7 @@ function selectPurchaseMaterial(id, materialId){
 let EXCEL_COMBINED = null;
 
 function normHeader(h){ return String(h==null?'':h).replace(/\s+/g,' ').trim(); }
+function normKey(h){ return normHeader(h).toLowerCase(); } // case-insensitive column matching — Excel headers get retyped with different capitalization over time (e.g. "Total output wt" → "Total Output Wt"), so matching must ignore case
 function findSheetName(wb, patterns){
   for(const p of patterns){ const n = wb.SheetNames.find(nm=>p.test(nm)); if(n) return n; }
   return null;
@@ -1451,19 +1600,19 @@ function excelDateToISO(val){
 
 function aggregateSheetExcelRows(wsData){
   if(!wsData || wsData.length<2) throw new Error('No data rows found.');
-  const headerRow = wsData[0].map(h=>String(h==null?'':h).trim());
+  const headerRow = wsData[0].map(normKey);
   const idx = {};
   headerRow.forEach((h,i)=>{ if(h && !(h in idx)) idx[h]=i; });
   const need = ['DATE','Imported Scrap','Local','Re-bonded','Hard Binder 1519','Medium Binder 1513','Soft Binder 1026/3156','Other Binder','Block Total','Total output wt','Wt. of Scrap (kg)'];
-  const missing = need.filter(k=>!(k in idx));
+  const missing = need.filter(k=>!(normKey(k) in idx));
   if(missing.length) throw new Error('Missing expected column(s): '+missing.join(', ')+'. Check this is the "Sheet Production Data" tab with unchanged headers.');
 
-  const num = (row,key) => { const v = row[idx[key]]; const n = parseFloat(v); return isFinite(n) ? n : 0; };
+  const num = (row,key) => { const v = row[idx[normKey(key)]]; const n = parseFloat(v); return isFinite(n) ? n : 0; };
   const byDate = {};
   for(let r=1;r<wsData.length;r++){
     const row = wsData[r];
     if(!row || row.length===0) continue;
-    const rawDate = row[idx['DATE']];
+    const rawDate = row[idx[normKey('DATE')]];
     if(rawDate===undefined || rawDate==='') continue;
     const dateStr = excelDateToISO(rawDate);
     if(!dateStr) continue;
@@ -1483,19 +1632,19 @@ function aggregateSheetExcelRows(wsData){
 
 function aggregateUnderlayExcelRows(wsData){
   if(!wsData || wsData.length<2) throw new Error('No data rows found.');
-  const headerRow = wsData[0].map(normHeader);
+  const headerRow = wsData[0].map(normKey);
   const idx = {};
   headerRow.forEach((h,i)=>{ if(h && !(h in idx)) idx[h]=i; });
   const need = ['Date','Roll Nos','Product SKU','Imported Foam Scrap','Local Foam Scrap','Rebonded Foam Scrap','Memory Foam Scrap','Hard Binder 1519','Soft Binder 1513','Soft Binder 1026','Total wastage (edge trimming)','Wastage (Peeling)'];
-  const missing = need.filter(k=>!(k in idx));
+  const missing = need.filter(k=>!(normKey(k) in idx));
   if(missing.length) throw new Error('Missing expected column(s): '+missing.join(', ')+'. Check this is the "Round Block data" tab with unchanged headers.');
 
-  const num = (row,key) => { const v = row[idx[key]]; const n = parseFloat(v); return isFinite(n) ? n : 0; };
+  const num = (row,key) => { const v = row[idx[normKey(key)]]; const n = parseFloat(v); return isFinite(n) ? n : 0; };
   const byDate = {};
   for(let r=1;r<wsData.length;r++){
     const row = wsData[r];
     if(!row || row.length===0) continue;
-    const rawDate = row[idx['Date']];
+    const rawDate = row[idx[normKey('Date')]];
     if(rawDate===undefined || rawDate==='') continue;
     const dateStr = excelDateToISO(rawDate);
     if(!dateStr) continue;
@@ -1507,7 +1656,7 @@ function aggregateUnderlayExcelRows(wsData){
     agg.blockTotalKg += imported+local+rebonded+memory+binder;
     agg.wastageKg += num(row,'Total wastage (edge trimming)') + num(row,'Wastage (Peeling)');
     agg.rows += 1;
-    const skuName = normHeader(row[idx['Product SKU']]);
+    const skuName = normHeader(row[idx[normKey('Product SKU')]]);
     const rolls = num(row,'Roll Nos');
     if(skuName){ agg.skuRolls[skuName] = (agg.skuRolls[skuName]||0) + rolls; }
   }
@@ -1698,7 +1847,7 @@ function applyCombinedExcelImport(dateStr){
         CURRENT_UNDERLAY_BATCHES.push(batch);
       }
       batch.skuId = sku.id;
-      const costs = computeSkuCosts(sku, PRICING);
+      const costs = computeSkuCosts(sku, pricingAt(dateStr));
       batch.weightPerRoll = Number(costs.weightPerRoll.toFixed(3));
       batch.frontCostPerRoll = Number(costs.frontCostPerRoll.toFixed(2));
       batch.backCostPerRoll = Number(costs.backCostPerRoll.toFixed(2));
@@ -1842,7 +1991,7 @@ function selectUnderlaySku(id, skuId){
   if(skuId){
     const sku = MASTER_SKUS.find(s=>s.id===skuId);
     if(sku){
-      const costs = computeSkuCosts(sku, PRICING);
+      const costs = computeSkuCosts(sku, pricingAt(document.getElementById('entryDate').value));
       b.weightPerRoll = Number(costs.weightPerRoll.toFixed(3));
       b.frontCostPerRoll = Number(costs.frontCostPerRoll.toFixed(2));
       b.backCostPerRoll = Number(costs.backCostPerRoll.toFixed(2));
@@ -2488,27 +2637,14 @@ async function deleteFromHistory(d){
 
 /* ---------------- settings ---------------- */
 function fillSettingsForm(){
-  document.getElementById('set_elecRate').value = SETTINGS.elecRate;
-  document.getElementById('set_woodRate').value = SETTINGS.woodRate;
   document.getElementById('set_gbpRate').value = SETTINGS.gbpRate;
-  document.getElementById('set_laborRateFoaming').value = SETTINGS.laborRateFoaming;
-  document.getElementById('set_laborRateCutting').value = SETTINGS.laborRateCutting;
-  document.getElementById('set_laborRatePeeling').value = SETTINGS.laborRatePeeling;
-  document.getElementById('set_laborRateLamination').value = SETTINGS.laborRateLamination;
-  document.getElementById('set_rent').value = SETTINGS.rent;
-  document.getElementById('set_admin').value = SETTINGS.admin;
-  document.getElementById('set_dep').value = SETTINGS.dep;
-  document.getElementById('set_other').value = SETTINGS.other;
-  document.getElementById('set_prodDays').value = SETTINGS.prodDays;
+  renderAllRateFieldsCurrent();
 }
 async function saveSettings(){
-  SETTINGS = {
-    elecRate: num('set_elecRate'), woodRate: num('set_woodRate'), gbpRate: num('set_gbpRate') || DEFAULT_SETTINGS.gbpRate,
-    laborRateFoaming: num('set_laborRateFoaming'), laborRateCutting: num('set_laborRateCutting'),
-    laborRatePeeling: num('set_laborRatePeeling'), laborRateLamination: num('set_laborRateLamination'),
-    rent: num('set_rent'), admin: num('set_admin'),
-    dep: num('set_dep'), other: num('set_other'), prodDays: num('set_prodDays') || 26
-  };
+  SETTINGS.gbpRate = num('set_gbpRate') || DEFAULT_SETTINGS.gbpRate;
+  // All other Settings-tab rates (electricity, wood, labor, overheads) are effective-dated —
+  // they're already live in SETTINGS via the rate-history widgets above, mutated directly by
+  // addRateHistoryEntry/removeRateHistoryEntry, so there's nothing else to read from a form field.
   const ok = await storageSet('settings', SETTINGS);
   const el = document.getElementById('settingsStatus');
   el.textContent = ok ? 'Settings saved.' : 'Kept for this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Use Export data to back it up.';
@@ -2518,33 +2654,14 @@ async function saveSettings(){
   updateLivePreview();
 }
 function fillPricingForm(){
-  document.getElementById('p_nonwovenPlain').value = PRICING.nonwovenPlain;
-  document.getElementById('p_nonwovenPrinted').value = PRICING.nonwovenPrinted;
-  document.getElementById('p_nonwovenWidthM').value = PRICING.nonwovenWidthM;
-  document.getElementById('p_nonwovenGSM').value = PRICING.nonwovenGSM;
-  document.getElementById('p_paperBrown').value = PRICING.paperBrown;
-  document.getElementById('p_paperWhite').value = PRICING.paperWhite;
-  document.getElementById('p_wilkiesBrownPaper').value = PRICING.wilkiesBrownPaper;
-  document.getElementById('p_wilkiesWhitePaper').value = PRICING.wilkiesWhitePaper;
-  document.getElementById('p_peFilm').value = PRICING.peFilm;
-  document.getElementById('p_silverFoil').value = PRICING.silverFoil;
-  document.getElementById('p_printedBag').value = PRICING.printedBag;
-  document.getElementById('p_otherBag').value = PRICING.otherBag;
-  document.getElementById('p_glueRate').value = PRICING.glueRate;
+  renderAllRateFieldsCurrent();
 }
 async function savePricing(){
-  PRICING = {
-    nonwovenPlain:num('p_nonwovenPlain'), nonwovenPrinted:num('p_nonwovenPrinted'),
-    nonwovenWidthM:num('p_nonwovenWidthM'), nonwovenGSM:num('p_nonwovenGSM'),
-    paperBrown:num('p_paperBrown'), paperWhite:num('p_paperWhite'),
-    wilkiesBrownPaper:num('p_wilkiesBrownPaper'), wilkiesWhitePaper:num('p_wilkiesWhitePaper'),
-    peFilm:num('p_peFilm'), silverFoil:num('p_silverFoil'),
-    printedBag:num('p_printedBag'), otherBag:num('p_otherBag'),
-    glueRate:num('p_glueRate')
-  };
+  // All roll lamination & packing rates (and glue) are effective-dated — already live in
+  // PRICING via the rate-history widgets above, nothing else to read from a form field.
   const ok = await storageSet('roll_pricing', PRICING);
   const el = document.getElementById('pricingStatus');
-  el.textContent = ok ? 'Rates saved. New SKU selections will use these — existing saved batches keep their locked-in per-roll cost until re-selected.' : 'Kept for this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Use Export data to back it up.';
+  el.textContent = ok ? 'Rates saved. New SKU selections from this point use them, according to whichever date they\'re applied to — existing saved batches keep their locked-in per-roll cost until re-selected.' : 'Kept for this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Use Export data to back it up.';
   el.className = ok ? 'status-msg' : 'status-msg err';
   showStorageWarningIfNeeded();
   renderDashboard();
@@ -2653,6 +2770,7 @@ async function init(){
   }
   document.getElementById('dashLoading').textContent = '';
 
+  renderRateFieldContainers();
   fillSettingsForm();
   fillPricingForm();
   renderMasterSkuTable();
