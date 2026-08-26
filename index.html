@@ -217,15 +217,15 @@
           <div class="kpi-val" id="kpiUnderlayCost">&mdash;</div>
           <p class="kpi-sub" id="kpiUnderlayOut">&mdash;</p>
         </div>
-        <div class="kpi k-neutral">
-          <p class="kpi-label">Blended Cost / kg</p>
-          <div class="kpi-val" id="kpiBlended">&mdash;</div>
-          <p class="kpi-sub" id="kpiTotalOut">&mdash;</p>
+        <div class="kpi k-amber">
+          <p class="kpi-label">Sheets &middot; Raw Material <span style="color:var(--muted-dk);">(excl. binder)</span></p>
+          <div class="kpi-val" id="kpiSheetRawExclBinder">&mdash;</div>
+          <p class="kpi-sub" id="kpiSheetBinderPct">&mdash;</p>
         </div>
-        <div class="kpi k-neutral">
-          <p class="kpi-label">Total Daily Cost <span style="color:var(--muted-dk);">(excl. raw material &amp; consumables)</span></p>
-          <div class="kpi-val" id="kpiTotalCost">&mdash;</div>
-          <p class="kpi-sub" id="kpiWastage">&mdash;</p>
+        <div class="kpi k-steel">
+          <p class="kpi-label">Underlay &middot; Raw Material <span style="color:var(--muted-dk);">(excl. binder)</span></p>
+          <div class="kpi-val" id="kpiUnderlayRawExclBinder">&mdash;</div>
+          <p class="kpi-sub" id="kpiUnderlayBinderPct">&mdash;</p>
         </div>
       </div>
 
@@ -523,15 +523,15 @@
           <div class="kpi-val" id="repUnderlayCost">&mdash;</div>
           <p class="kpi-sub" id="repUnderlayOut">&mdash;</p>
         </div>
-        <div class="kpi k-neutral">
-          <p class="kpi-label">Blended Cost / kg</p>
-          <div class="kpi-val" id="repBlended">&mdash;</div>
-          <p class="kpi-sub" id="repTotalOut">&mdash;</p>
+        <div class="kpi k-amber">
+          <p class="kpi-label">Sheets &middot; Raw Material <span style="color:var(--muted-dk);">(excl. binder)</span></p>
+          <div class="kpi-val" id="repSheetRawExclBinder">&mdash;</div>
+          <p class="kpi-sub" id="repSheetBinderPct">&mdash;</p>
         </div>
-        <div class="kpi k-neutral">
-          <p class="kpi-label">Total Cost <span style="color:var(--muted-dk);">(excl. raw material &amp; consumables)</span></p>
-          <div class="kpi-val" id="repTotalCost">&mdash;</div>
-          <p class="kpi-sub" id="repDaysLogged">&mdash;</p>
+        <div class="kpi k-steel">
+          <p class="kpi-label">Underlay &middot; Raw Material <span style="color:var(--muted-dk);">(excl. binder)</span></p>
+          <div class="kpi-val" id="repUnderlayRawExclBinder">&mdash;</div>
+          <p class="kpi-sub" id="repUnderlayBinderPct">&mdash;</p>
         </div>
       </div>
 
@@ -1208,6 +1208,23 @@ function computeInventoryLedger(entriesMap, materialMaster){
   return { ledgerByDate, finalState: state, lastDate: dates.length ? dates[dates.length-1] : null };
 }
 
+function binderSplit(rawMaterials){
+  // Splits a line's raw material consumption into binder vs everything else (foam scrap types),
+  // since binder's ₹/kg is typically far higher than the foam it's mixed with and skews a plain
+  // average. Matched by name containing "binder", same convention as reclaim-material matching.
+  const totalQtyKg = rawMaterials.reduce((s,m)=>s+(m.qtyKg||0),0);
+  const binderRows = rawMaterials.filter(m=>/binder/i.test(m.materialName||''));
+  const nonBinderRows = rawMaterials.filter(m=>!/binder/i.test(m.materialName||''));
+  const binderQtyKg = binderRows.reduce((s,m)=>s+(m.qtyKg||0),0);
+  const nonBinderQtyKg = nonBinderRows.reduce((s,m)=>s+(m.qtyKg||0),0);
+  const nonBinderCost = nonBinderRows.reduce((s,m)=>s+(m.qtyKg||0)*(m.rate||0),0);
+  return {
+    binderQtyKg, nonBinderQtyKg, nonBinderCost,
+    nonBinderPerKg: nonBinderQtyKg>0 ? nonBinderCost/nonBinderQtyKg : 0,
+    binderPct: totalQtyKg>0 ? (binderQtyKg/totalQtyKg)*100 : 0
+  };
+}
+
 function computeDay(e, settings, materialRates, reclaimRate){
   materialRates = materialRates || {};
   reclaimRate = reclaimRate || 0;
@@ -1266,6 +1283,7 @@ function computeDay(e, settings, materialRates, reclaimRate){
   sheets.conversionPerKg = totalSheetOut>0 ? sheets.conversionCost/totalSheetOut : 0;
   sheets.efficiencyPct = sheetRawInputKg>0 ? (1 - (e.sh_wastageKg||0)/sheetRawInputKg)*100 : 0;
   sheets.rawInputKg = sheetRawInputKg;
+  Object.assign(sheets, binderSplit(sheetRawMaterials));
 
   const underlayRawMaterials = (e.u_rawMaterials||[]).map(m=>{
     const resolved = materialRates[m.materialId];
@@ -1326,6 +1344,7 @@ function computeDay(e, settings, materialRates, reclaimRate){
   underlay.conversionPerKg = totalUnderlayOut>0 ? underlay.conversionCost/totalUnderlayOut : 0;
   underlay.efficiencyPct = underlayRawInputKg>0 ? (1 - (e.u_wastageKg||0)/underlayRawInputKg)*100 : 0;
   underlay.rawInputKg = underlayRawInputKg;
+  Object.assign(underlay, binderSplit(underlayRawMaterials));
 
   const totalCost = sheets.total+underlay.total;
   const totalOut = sheets.outputKg+underlay.outputKg;
@@ -2146,10 +2165,10 @@ function renderDashboard(){
   document.getElementById('kpiSheetOut').textContent = fmtKg(c.sheets.outputKg) + ' produced &middot; ' + c.sheets.batches.length + ' SKUs';
   document.getElementById('kpiUnderlayCost').innerHTML = fmtMoney(c.underlay.perKg) + '<small>/kg</small>';
   document.getElementById('kpiUnderlayOut').innerHTML = fmtKg(c.underlay.outputKg) + ' produced &middot; ' + (c.underlay.rollCount||0) + ' rolls, ' + c.underlay.batches.length + ' SKUs';
-  document.getElementById('kpiBlended').innerHTML = fmtMoney(c.blended) + '<small>/kg</small>';
-  document.getElementById('kpiTotalOut').textContent = fmtKg(c.totalOut) + ' total output';
-  document.getElementById('kpiTotalCost').textContent = fmtMoney(c.totalCostExclRaw);
-  document.getElementById('kpiWastage').textContent = 'Wastage: ' + fmtKg(c.sheets.wastageKg + c.underlay.wastageKg);
+  document.getElementById('kpiSheetRawExclBinder').innerHTML = fmtMoney(c.sheets.nonBinderPerKg) + '<small>/kg</small>';
+  document.getElementById('kpiSheetBinderPct').textContent = 'Binder: ' + c.sheets.binderPct.toFixed(1) + '% of raw material weight';
+  document.getElementById('kpiUnderlayRawExclBinder').innerHTML = fmtMoney(c.underlay.nonBinderPerKg) + '<small>/kg</small>';
+  document.getElementById('kpiUnderlayBinderPct').textContent = 'Binder: ' + c.underlay.binderPct.toFixed(1) + '% of raw material weight';
   document.getElementById('kpiSheetConversion').innerHTML = fmtMoney(c.sheets.conversionPerKg) + '<small>/kg</small>';
   document.getElementById('kpiUnderlayConversion').innerHTML = fmtMoney(c.underlay.conversionPerKg) + '<small>/kg</small>';
   document.getElementById('kpiSheetEfficiency').innerHTML = c.sheets.efficiencyPct.toFixed(2) + '<small>%</small>';
@@ -2555,8 +2574,8 @@ function renderReports(){
   const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
   const cats = ['raw','labor','elec','consum','other','oh'];
   const agg = {
-    sheets: {outputKg:0, wastageKg:0, total:0, conversionCost:0, batches:0, rawInputKg:0},
-    underlay: {outputKg:0, wastageKg:0, total:0, conversionCost:0, batches:0, rollCount:0, rawInputKg:0},
+    sheets: {outputKg:0, wastageKg:0, total:0, conversionCost:0, batches:0, rawInputKg:0, binderQtyKg:0, nonBinderQtyKg:0, nonBinderCost:0},
+    underlay: {outputKg:0, wastageKg:0, total:0, conversionCost:0, batches:0, rollCount:0, rawInputKg:0, binderQtyKg:0, nonBinderQtyKg:0, nonBinderCost:0},
     totalCost:0, totalCostExclRaw:0
   };
   cats.forEach(k=>{ agg.sheets[k]=0; agg.underlay[k]=0; });
@@ -2567,30 +2586,35 @@ function renderReports(){
     agg.sheets.outputKg += c.sheets.outputKg; agg.sheets.wastageKg += c.sheets.wastageKg||0;
     agg.sheets.total += c.sheets.total; agg.sheets.conversionCost += c.sheets.conversionCost;
     agg.sheets.batches += c.sheets.batches.length; agg.sheets.rawInputKg += c.sheets.rawInputKg||0;
+    agg.sheets.binderQtyKg += c.sheets.binderQtyKg||0; agg.sheets.nonBinderQtyKg += c.sheets.nonBinderQtyKg||0; agg.sheets.nonBinderCost += c.sheets.nonBinderCost||0;
     agg.underlay.outputKg += c.underlay.outputKg; agg.underlay.wastageKg += c.underlay.wastageKg||0;
     agg.underlay.total += c.underlay.total; agg.underlay.conversionCost += c.underlay.conversionCost;
     agg.underlay.batches += c.underlay.batches.length; agg.underlay.rollCount += c.underlay.rollCount||0;
     agg.underlay.rawInputKg += c.underlay.rawInputKg||0;
+    agg.underlay.binderQtyKg += c.underlay.binderQtyKg||0; agg.underlay.nonBinderQtyKg += c.underlay.nonBinderQtyKg||0; agg.underlay.nonBinderCost += c.underlay.nonBinderCost||0;
     agg.totalCost += c.totalCost; agg.totalCostExclRaw += c.totalCostExclRaw;
   });
 
-  const sOut = agg.sheets.outputKg, uOut = agg.underlay.outputKg, tOut = sOut+uOut;
+  const sOut = agg.sheets.outputKg, uOut = agg.underlay.outputKg;
   const sPerKg = sOut>0 ? agg.sheets.total/sOut : 0;
   const uPerKg = uOut>0 ? agg.underlay.total/uOut : 0;
-  const blended = tOut>0 ? (agg.sheets.total+agg.underlay.total)/tOut : 0;
   const sConvPerKg = sOut>0 ? agg.sheets.conversionCost/sOut : 0;
   const uConvPerKg = uOut>0 ? agg.underlay.conversionCost/uOut : 0;
   const sEff = agg.sheets.rawInputKg>0 ? (1 - agg.sheets.wastageKg/agg.sheets.rawInputKg)*100 : 0;
   const uEff = agg.underlay.rawInputKg>0 ? (1 - agg.underlay.wastageKg/agg.underlay.rawInputKg)*100 : 0;
+  const sNonBinderPerKg = agg.sheets.nonBinderQtyKg>0 ? agg.sheets.nonBinderCost/agg.sheets.nonBinderQtyKg : 0;
+  const uNonBinderPerKg = agg.underlay.nonBinderQtyKg>0 ? agg.underlay.nonBinderCost/agg.underlay.nonBinderQtyKg : 0;
+  const sBinderPct = agg.sheets.rawInputKg>0 ? (agg.sheets.binderQtyKg/agg.sheets.rawInputKg)*100 : 0;
+  const uBinderPct = agg.underlay.rawInputKg>0 ? (agg.underlay.binderQtyKg/agg.underlay.rawInputKg)*100 : 0;
 
   document.getElementById('repSheetCost').innerHTML = fmtMoney(sPerKg) + '<small>/kg</small>';
   document.getElementById('repSheetOut').textContent = fmtKg(sOut) + ' produced &middot; ' + agg.sheets.batches + ' SKU batches';
   document.getElementById('repUnderlayCost').innerHTML = fmtMoney(uPerKg) + '<small>/kg</small>';
   document.getElementById('repUnderlayOut').innerHTML = fmtKg(uOut) + ' produced &middot; ' + agg.underlay.rollCount + ' rolls, ' + agg.underlay.batches + ' SKU batches';
-  document.getElementById('repBlended').innerHTML = fmtMoney(blended) + '<small>/kg</small>';
-  document.getElementById('repTotalOut').textContent = fmtKg(tOut) + ' total output';
-  document.getElementById('repTotalCost').textContent = fmtMoney(agg.totalCostExclRaw);
-  document.getElementById('repDaysLogged').textContent = dates.length + ' day' + (dates.length===1?'':'s') + ' logged in range';
+  document.getElementById('repSheetRawExclBinder').innerHTML = fmtMoney(sNonBinderPerKg) + '<small>/kg</small>';
+  document.getElementById('repSheetBinderPct').textContent = 'Binder: ' + sBinderPct.toFixed(1) + '% of raw material weight';
+  document.getElementById('repUnderlayRawExclBinder').innerHTML = fmtMoney(uNonBinderPerKg) + '<small>/kg</small>';
+  document.getElementById('repUnderlayBinderPct').textContent = 'Binder: ' + uBinderPct.toFixed(1) + '% of raw material weight';
   document.getElementById('repSheetConversion').innerHTML = fmtMoney(sConvPerKg) + '<small>/kg</small>';
   document.getElementById('repUnderlayConversion').innerHTML = fmtMoney(uConvPerKg) + '<small>/kg</small>';
   document.getElementById('repSheetEfficiency').innerHTML = sEff.toFixed(2) + '<small>%</small>';
