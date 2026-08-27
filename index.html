@@ -559,6 +559,19 @@
       </div>
 
       <div class="panel">
+        <h2>Roll SKU cost &mdash; <span class="accent">weighted average for this period</span></h2>
+        <div class="tbl-wrap">
+          <table id="reportSkuTable">
+            <thead>
+              <tr><th>SKU</th><th>Rolls</th><th>Output (kg)</th><th>Materials Cost</th><th>Process Cost</th><th>Total Cost</th><th>Avg ₹/kg</th><th>Avg ₹/roll</th><th>Avg £/roll</th></tr>
+            </thead>
+            <tbody id="reportSkuBody"></tbody>
+          </table>
+        </div>
+        <div class="note-box">Averages are weighted by actual production volume — total cost across every day in this period, divided by total rolls or kg — not a plain average of each day's rate. £/roll converts each day's cost using that day's own locked exchange rate, then sums, so a rate change partway through the period is reflected correctly rather than applied retroactively. Batches without a matching SKU (Custom) are grouped together under "Custom".</div>
+      </div>
+
+      <div class="panel">
         <h2>Cost composition &mdash; <span class="accent">totals for this period</span></h2>
         <div class="tbl-wrap">
           <table id="reportCompositionTable">
@@ -2556,6 +2569,48 @@ function applyReportPreset(){
   }
   renderReports();
 }
+function renderReportSkuTable(skuAgg){
+  const rows = Object.values(skuAgg).sort((a,b)=> b.rollCount - a.rollCount);
+  const body = document.getElementById('reportSkuBody');
+  if(rows.length===0){
+    body.innerHTML = `<tr><td colspan="9" class="batch-empty">No roll SKUs produced in this period.</td></tr>`;
+    return;
+  }
+  let sumRolls=0, sumOut=0, sumMat=0, sumProc=0, sumTotal=0, sumGBP=0;
+  const trs = rows.map(s=>{
+    sumRolls+=s.rollCount; sumOut+=s.outputKg; sumMat+=s.materialsCost; sumProc+=s.processCost; sumTotal+=s.totalCost; sumGBP+=s.totalCostGBP;
+    const perKg = s.outputKg>0 ? s.totalCost/s.outputKg : 0;
+    const perRoll = s.rollCount>0 ? s.totalCost/s.rollCount : 0;
+    const perRollGBP = s.rollCount>0 ? s.totalCostGBP/s.rollCount : 0;
+    return `<tr>
+      <td>${s.name}</td>
+      <td style="font-family:var(--f-mono);">${s.rollCount}</td>
+      <td style="font-family:var(--f-mono);">${fmtKg(s.outputKg)}</td>
+      <td style="font-family:var(--f-mono);">${fmtMoney(s.materialsCost)}</td>
+      <td style="font-family:var(--f-mono);">${fmtMoney(s.processCost)}</td>
+      <td style="font-family:var(--f-mono);font-weight:600;">${fmtMoney(s.totalCost)}</td>
+      <td style="font-family:var(--f-mono);">${fmtMoney(perKg)}</td>
+      <td style="font-family:var(--f-mono);">${fmtMoney(perRoll)}</td>
+      <td style="font-family:var(--f-mono);">£${perRollGBP.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+  const totalPerKg = sumOut>0 ? sumTotal/sumOut : 0;
+  const totalPerRoll = sumRolls>0 ? sumTotal/sumRolls : 0;
+  const totalPerRollGBP = sumRolls>0 ? sumGBP/sumRolls : 0;
+  const totalRow = rows.length>1 ? `<tr class="total-row">
+    <td>Total</td>
+    <td style="font-family:var(--f-mono);">${sumRolls}</td>
+    <td style="font-family:var(--f-mono);">${fmtKg(sumOut)}</td>
+    <td style="font-family:var(--f-mono);">${fmtMoney(sumMat)}</td>
+    <td style="font-family:var(--f-mono);">${fmtMoney(sumProc)}</td>
+    <td style="font-family:var(--f-mono);">${fmtMoney(sumTotal)}</td>
+    <td style="font-family:var(--f-mono);">${fmtMoney(totalPerKg)}</td>
+    <td style="font-family:var(--f-mono);">${fmtMoney(totalPerRoll)}</td>
+    <td style="font-family:var(--f-mono);">£${totalPerRollGBP.toFixed(2)}</td>
+  </tr>` : '';
+  body.innerHTML = trs + totalRow;
+}
+
 function renderReports(){
   const from = document.getElementById('reportFrom').value;
   const to = document.getElementById('reportTo').value;
@@ -2579,9 +2634,19 @@ function renderReports(){
     totalCost:0, totalCostExclRaw:0
   };
   cats.forEach(k=>{ agg.sheets[k]=0; agg.underlay[k]=0; });
+  const skuAgg = {}; // skuId (or '__custom__') -> {name, rollCount, outputKg, materialsCost, processCost, totalCost, totalCostGBP}
 
   dates.forEach(d=>{
     const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{}, (ledger.ledgerByDate[d]||{}).reclaimRate);
+    const gbpRate = (ENTRIES[d].gbpRateUsed) || SETTINGS.gbpRate;
+    c.underlay.batches.forEach(b=>{
+      const key = b.skuId || '__custom__';
+      if(!skuAgg[key]) skuAgg[key] = {name: b.skuId ? b.skuName : 'Custom', rollCount:0, outputKg:0, materialsCost:0, processCost:0, totalCost:0, totalCostGBP:0};
+      const s = skuAgg[key];
+      s.rollCount += b.rollCount||0; s.outputKg += b.outputKg||0;
+      s.materialsCost += b.materialsCost||0; s.processCost += b.processCost||0; s.totalCost += b.totalCost||0;
+      s.totalCostGBP += (b.totalCost||0) / (gbpRate||1);
+    });
     cats.forEach(k=>{ agg.sheets[k]+=c.sheets[k]||0; agg.underlay[k]+=c.underlay[k]||0; });
     agg.sheets.outputKg += c.sheets.outputKg; agg.sheets.wastageKg += c.sheets.wastageKg||0;
     agg.sheets.total += c.sheets.total; agg.sheets.conversionCost += c.sheets.conversionCost;
@@ -2594,6 +2659,7 @@ function renderReports(){
     agg.underlay.binderQtyKg += c.underlay.binderQtyKg||0; agg.underlay.nonBinderQtyKg += c.underlay.nonBinderQtyKg||0; agg.underlay.nonBinderCost += c.underlay.nonBinderCost||0;
     agg.totalCost += c.totalCost; agg.totalCostExclRaw += c.totalCostExclRaw;
   });
+  renderReportSkuTable(skuAgg);
 
   const sOut = agg.sheets.outputKg, uOut = agg.underlay.outputKg;
   const sPerKg = sOut>0 ? agg.sheets.total/sOut : 0;
