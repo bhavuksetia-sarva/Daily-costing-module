@@ -310,7 +310,7 @@
           <div class="chart-wrap" id="trendChart"></div>
         </div>
         <div class="panel">
-          <h2>Output <span class="accent">&mdash; last 30 entries</span></h2>
+          <h2>Conversion cost / kg trend <span class="accent">&mdash; last 30 entries</span></h2>
           <div class="chart-wrap" id="outputChart"></div>
         </div>
       </div>
@@ -592,7 +592,7 @@
         <div class="chart-wrap" id="reportTrendChart"></div>
       </div>
       <div class="panel">
-        <h2>Output <span class="accent">&mdash; each logged day in this period</span></h2>
+        <h2>Conversion cost / kg trend <span class="accent">&mdash; each logged day in this period</span></h2>
         <div class="chart-wrap" id="reportOutputChart"></div>
       </div>
     </div>
@@ -2281,23 +2281,23 @@ function svgStackedBarChart(containerId, labels, series){
 function renderTrendCharts(){
   const dates = Object.keys(ENTRIES).sort().slice(-30);
   const labels = dates.map(d=>d.slice(5));
-  const sheetVals = [], underlayVals = [], sheetOut = [], underlayOut = [];
+  const sheetVals = [], underlayVals = [], sheetConvVals = [], underlayConvVals = [];
   const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
   dates.forEach(d=>{
     const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{}, (ledger.ledgerByDate[d]||{}).reclaimRate);
     sheetVals.push(Number(c.sheets.perKg.toFixed(2)));
     underlayVals.push(Number(c.underlay.perKg.toFixed(2)));
-    sheetOut.push(Number(c.sheets.outputKg.toFixed(1)));
-    underlayOut.push(Number(c.underlay.outputKg.toFixed(1)));
+    sheetConvVals.push(Number(c.sheets.conversionPerKg.toFixed(2)));
+    underlayConvVals.push(Number(c.underlay.conversionPerKg.toFixed(2)));
   });
 
   svgLineChart('trendChart', labels, [
     {name:'Sheets avg ₹/kg', data:sheetVals, color:'#e8a33d'},
     {name:'Underlay avg ₹/kg', data:underlayVals, color:'#5b8aa6'}
   ]);
-  svgStackedBarChart('outputChart', labels, [
-    {name:'Sheets kg', data:sheetOut, color:'#e8a33d'},
-    {name:'Underlay kg', data:underlayOut, color:'#5b8aa6'}
+  svgLineChart('outputChart', labels, [
+    {name:'Sheets conversion ₹/kg', data:sheetConvVals, color:'#e8a33d'},
+    {name:'Underlay conversion ₹/kg', data:underlayConvVals, color:'#5b8aa6'}
   ]);
 }
 
@@ -2677,21 +2677,21 @@ function renderReports(){
   renderCompositionTableInto('reportCompositionBody', compC);
 
   const labels = dates.map(d=>d.slice(5));
-  const sheetVals=[], underlayVals=[], sheetOut=[], underlayOut=[];
+  const sheetVals=[], underlayVals=[], sheetConvVals=[], underlayConvVals=[];
   dates.forEach(d=>{
     const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{}, (ledger.ledgerByDate[d]||{}).reclaimRate);
     sheetVals.push(Number(c.sheets.perKg.toFixed(2)));
     underlayVals.push(Number(c.underlay.perKg.toFixed(2)));
-    sheetOut.push(Number(c.sheets.outputKg.toFixed(1)));
-    underlayOut.push(Number(c.underlay.outputKg.toFixed(1)));
+    sheetConvVals.push(Number(c.sheets.conversionPerKg.toFixed(2)));
+    underlayConvVals.push(Number(c.underlay.conversionPerKg.toFixed(2)));
   });
   svgLineChart('reportTrendChart', labels, [
     {name:'Sheets avg ₹/kg', data:sheetVals, color:'#e8a33d'},
     {name:'Underlay avg ₹/kg', data:underlayVals, color:'#5b8aa6'}
   ]);
-  svgStackedBarChart('reportOutputChart', labels, [
-    {name:'Sheets kg', data:sheetOut, color:'#e8a33d'},
-    {name:'Underlay kg', data:underlayOut, color:'#5b8aa6'}
+  svgLineChart('reportOutputChart', labels, [
+    {name:'Sheets conversion ₹/kg', data:sheetConvVals, color:'#e8a33d'},
+    {name:'Underlay conversion ₹/kg', data:underlayConvVals, color:'#5b8aa6'}
   ]);
 }
 
