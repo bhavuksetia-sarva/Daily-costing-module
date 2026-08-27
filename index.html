@@ -563,7 +563,7 @@
         <div class="tbl-wrap">
           <table id="reportSkuTable">
             <thead>
-              <tr><th>SKU</th><th>Rolls</th><th>Output (kg)</th><th>Materials Cost</th><th>Process Cost</th><th>Total Cost</th><th>Avg ₹/kg</th><th>Avg ₹/roll</th><th>Avg £/roll</th></tr>
+              <tr><th>SKU</th><th>Rolls</th><th>Total Cost</th><th>Avg £/roll</th></tr>
             </thead>
             <tbody id="reportSkuBody"></tbody>
           </table>
@@ -2573,39 +2573,25 @@ function renderReportSkuTable(skuAgg){
   const rows = Object.values(skuAgg).sort((a,b)=> b.rollCount - a.rollCount);
   const body = document.getElementById('reportSkuBody');
   if(rows.length===0){
-    body.innerHTML = `<tr><td colspan="9" class="batch-empty">No roll SKUs produced in this period.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="4" class="batch-empty">No roll SKUs produced in this period.</td></tr>`;
     return;
   }
-  let sumRolls=0, sumOut=0, sumMat=0, sumProc=0, sumTotal=0, sumGBP=0;
+  let sumRolls=0, sumTotal=0, sumGBP=0;
   const trs = rows.map(s=>{
-    sumRolls+=s.rollCount; sumOut+=s.outputKg; sumMat+=s.materialsCost; sumProc+=s.processCost; sumTotal+=s.totalCost; sumGBP+=s.totalCostGBP;
-    const perKg = s.outputKg>0 ? s.totalCost/s.outputKg : 0;
-    const perRoll = s.rollCount>0 ? s.totalCost/s.rollCount : 0;
+    sumRolls+=s.rollCount; sumTotal+=s.totalCost; sumGBP+=s.totalCostGBP;
     const perRollGBP = s.rollCount>0 ? s.totalCostGBP/s.rollCount : 0;
     return `<tr>
       <td>${s.name}</td>
       <td style="font-family:var(--f-mono);">${s.rollCount}</td>
-      <td style="font-family:var(--f-mono);">${fmtKg(s.outputKg)}</td>
-      <td style="font-family:var(--f-mono);">${fmtMoney(s.materialsCost)}</td>
-      <td style="font-family:var(--f-mono);">${fmtMoney(s.processCost)}</td>
       <td style="font-family:var(--f-mono);font-weight:600;">${fmtMoney(s.totalCost)}</td>
-      <td style="font-family:var(--f-mono);">${fmtMoney(perKg)}</td>
-      <td style="font-family:var(--f-mono);">${fmtMoney(perRoll)}</td>
       <td style="font-family:var(--f-mono);">£${perRollGBP.toFixed(2)}</td>
     </tr>`;
   }).join('');
-  const totalPerKg = sumOut>0 ? sumTotal/sumOut : 0;
-  const totalPerRoll = sumRolls>0 ? sumTotal/sumRolls : 0;
   const totalPerRollGBP = sumRolls>0 ? sumGBP/sumRolls : 0;
   const totalRow = rows.length>1 ? `<tr class="total-row">
     <td>Total</td>
     <td style="font-family:var(--f-mono);">${sumRolls}</td>
-    <td style="font-family:var(--f-mono);">${fmtKg(sumOut)}</td>
-    <td style="font-family:var(--f-mono);">${fmtMoney(sumMat)}</td>
-    <td style="font-family:var(--f-mono);">${fmtMoney(sumProc)}</td>
     <td style="font-family:var(--f-mono);">${fmtMoney(sumTotal)}</td>
-    <td style="font-family:var(--f-mono);">${fmtMoney(totalPerKg)}</td>
-    <td style="font-family:var(--f-mono);">${fmtMoney(totalPerRoll)}</td>
     <td style="font-family:var(--f-mono);">£${totalPerRollGBP.toFixed(2)}</td>
   </tr>` : '';
   body.innerHTML = trs + totalRow;
