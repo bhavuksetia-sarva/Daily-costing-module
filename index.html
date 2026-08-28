@@ -62,6 +62,10 @@
   .kpi-sub{font-family:var(--f-mono);font-size:11px;color:var(--muted-dk);margin-top:6px;}
 
   .date-picker-row{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+
+  .unit-switcher-row{display:flex;align-items:center;gap:10px;padding:10px 0 0;}
+  .unit-switcher-row label{font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+  .unit-switcher-row select{border-color:var(--amber);font-weight:600;min-width:260px;}
   .date-picker-row label{font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
   select, input[type=date], input[type=number], input[type=text], textarea{
     background:var(--panel3);border:1px solid var(--border-lt);color:var(--text);
@@ -192,6 +196,12 @@
       <button data-tab="settings">Settings</button>
     </nav>
   </header>
+
+  <div class="unit-switcher-row">
+    <label for="unitSelect">Viewing unit</label>
+    <select id="unitSelect" onchange="switchUnit(this.value)"></select>
+    <span id="unitLoadingNote" class="loading-note"></span>
+  </div>
 
   <!-- ============ DASHBOARD ============ -->
   <section class="view active" id="view-dashboard">
@@ -1047,6 +1057,30 @@ const SUPABASE_HEADERS = {
 let STORAGE_OK = true;
 let LAST_STORAGE_ERROR = '';
 
+/* ---------------- multi-unit data isolation ---------------- */
+// Unit 1 keeps the original, unprefixed key names — this means SARVA FOAM's real
+// production data in Supabase needs zero migration. Every other unit gets its own
+// namespaced keys (e.g. "settings:unit2", "daily:unit2:2026-08-25") so a change to
+// one unit's rates, SKUs, or logs can never affect another's.
+const UNITS = [
+  { id: 'unit1', name: 'Sarva Foam — Rebonded & Underlay Division', hasUnderlay: true },
+  { id: 'unit2', name: 'Unit 2', hasUnderlay: true },
+  { id: 'unit3', name: 'Unit 3', hasUnderlay: true },
+  { id: 'unit4', name: 'Unit 4', hasUnderlay: true }
+];
+const LEGACY_UNIT_ID = 'unit1';
+let CURRENT_UNIT_ID = LEGACY_UNIT_ID;
+function currentUnit(){ return UNITS.find(u=>u.id===CURRENT_UNIT_ID) || UNITS[0]; }
+function unitScopedKey(baseKey){
+  return CURRENT_UNIT_ID===LEGACY_UNIT_ID ? baseKey : baseKey+':'+CURRENT_UNIT_ID;
+}
+function dailyKeyPrefix(){
+  return CURRENT_UNIT_ID===LEGACY_UNIT_ID ? 'daily:' : 'daily:'+CURRENT_UNIT_ID+':';
+}
+function dailyKey(date){
+  return dailyKeyPrefix()+date;
+}
+
 async function storageGet(key){
   try{
     const resp = await fetch(`${SUPABASE_REST}?key=eq.${encodeURIComponent(key)}&select=value`, { headers: SUPABASE_HEADERS });
@@ -1129,11 +1163,11 @@ async function importAllData(file){
 
     // try to push into storage too, in case it's available now
     if(STORAGE_OK){
-      await storageSet('settings', SETTINGS);
-      await storageSet('roll_pricing', PRICING);
-      await storageSet('roll_master_skus', MASTER_SKUS);
-      await storageSet('raw_material_master', RAW_MATERIAL_MASTER);
-      await Promise.all(Object.values(ENTRIES).map(e => storageSet('daily:'+e.date, e)));
+      await storageSet(unitScopedKey('settings'), SETTINGS);
+      await storageSet(unitScopedKey('roll_pricing'), PRICING);
+      await storageSet(unitScopedKey('roll_master_skus'), MASTER_SKUS);
+      await storageSet(unitScopedKey('raw_material_master'), RAW_MATERIAL_MASTER);
+      await Promise.all(Object.values(ENTRIES).map(e => storageSet(dailyKey(e.date), e)));
     }
 
     fillSettingsForm(); fillPricingForm(); renderMasterSkuTable(); renderRawMaterialMasterTable();
@@ -1147,23 +1181,33 @@ async function importAllData(file){
 }
 
 async function loadSettings(){
-  const raw = await storageGet('settings');
+  const raw = await storageGet(unitScopedKey('settings'));
   if(raw){ try{ SETTINGS = migrateSettingsHistory({...DEFAULT_SETTINGS, ...JSON.parse(raw)}); }catch(e){} }
 }
 async function loadPricing(){
-  const raw = await storageGet('roll_pricing');
+  const raw = await storageGet(unitScopedKey('roll_pricing'));
   if(raw){ try{ PRICING = migratePricingHistory({...DEFAULT_PRICING, ...JSON.parse(raw)}); }catch(e){} }
 }
 async function loadMasterSkus(){
-  const raw = await storageGet('roll_master_skus');
+  const raw = await storageGet(unitScopedKey('roll_master_skus'));
   if(raw){ try{ const parsed = JSON.parse(raw); if(Array.isArray(parsed) && parsed.length) MASTER_SKUS = parsed; }catch(e){} }
 }
 async function loadRawMaterialMaster(){
-  const raw = await storageGet('raw_material_master');
+  const raw = await storageGet(unitScopedKey('raw_material_master'));
   if(raw){ try{ const parsed = JSON.parse(raw); if(Array.isArray(parsed) && parsed.length) RAW_MATERIAL_MASTER = parsed; }catch(e){} }
 }
+async function listDailyKeysForCurrentUnit(){
+  // Only the legacy unit's prefix ("daily:") is a substring of every other unit's prefix
+  // ("daily:unit2:", "daily:unit3:", ...), so a plain prefix match would also pull in other
+  // units' entries for the legacy unit specifically. Filter those back out client-side.
+  const keys = await storageList(dailyKeyPrefix());
+  if(CURRENT_UNIT_ID===LEGACY_UNIT_ID){
+    return keys.filter(k=>/^daily:\d{4}-\d{2}-\d{2}$/.test(k));
+  }
+  return keys;
+}
 async function loadAllEntries(){
-  const keys = await storageList('daily:');
+  const keys = await listDailyKeysForCurrentUnit();
   const results = await Promise.all(keys.map(k => storageGet(k)));
   ENTRIES = {};
   keys.forEach((k, i) => {
@@ -2394,7 +2438,7 @@ document.getElementById('entryDate').addEventListener('change', ()=>{
 async function saveEntry(){
   const e = readEntryForm();
   if(!e.date){ document.getElementById('entryStatus').textContent = 'Pick a date first.'; document.getElementById('entryStatus').className='status-msg err'; return; }
-  const ok = await storageSet('daily:'+e.date, e);
+  const ok = await storageSet(dailyKey(e.date), e);
   const statusEl = document.getElementById('entryStatus');
   ENTRIES[e.date] = e; // keep it in memory for this session even if the central save failed
   setExistingEntryControlsVisible(true);
@@ -2414,7 +2458,7 @@ async function deleteCurrentEntry(){
   const d = document.getElementById('entryDate').value;
   if(!ENTRIES[d]) return;
   if(!confirm('Delete the logged entry for '+d+'? This cannot be undone.')) return;
-  await storageDelete('daily:'+d);
+  await storageDelete(dailyKey(d));
   delete ENTRIES[d];
   clearEntryForm();
   setExistingEntryControlsVisible(false);
@@ -2442,14 +2486,14 @@ async function moveEntryToDate(){
   }
 
   const entry = {...ENTRIES[oldDate], date: newDate};
-  const savedNew = await storageSet('daily:'+newDate, entry);
+  const savedNew = await storageSet(dailyKey(newDate), entry);
   if(!savedNew){
     statusEl.textContent = 'Could not save under the new date (' + (LAST_STORAGE_ERROR||'unknown error') + ') — nothing was moved.';
     statusEl.className = 'status-msg err';
     showStorageWarningIfNeeded();
     return;
   }
-  await storageDelete('daily:'+oldDate);
+  await storageDelete(dailyKey(oldDate));
   delete ENTRIES[oldDate];
   ENTRIES[newDate] = entry;
 
@@ -2761,7 +2805,7 @@ function editFromHistory(d){
 }
 async function deleteFromHistory(d){
   if(!confirm('Delete the logged entry for '+d+'? This cannot be undone.')) return;
-  await storageDelete('daily:'+d);
+  await storageDelete(dailyKey(d));
   delete ENTRIES[d];
   populateDashDateSelect();
   renderHistory();
@@ -2778,7 +2822,7 @@ async function saveSettings(){
   // All other Settings-tab rates (electricity, wood, labor, overheads) are effective-dated —
   // they're already live in SETTINGS via the rate-history widgets above, mutated directly by
   // addRateHistoryEntry/removeRateHistoryEntry, so there's nothing else to read from a form field.
-  const ok = await storageSet('settings', SETTINGS);
+  const ok = await storageSet(unitScopedKey('settings'), SETTINGS);
   const el = document.getElementById('settingsStatus');
   el.textContent = ok ? 'Settings saved.' : 'Kept for this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Use Export data to back it up.';
   el.className = ok ? 'status-msg' : 'status-msg err';
@@ -2792,7 +2836,7 @@ function fillPricingForm(){
 async function savePricing(){
   // All roll lamination & packing rates (and glue) are effective-dated — already live in
   // PRICING via the rate-history widgets above, nothing else to read from a form field.
-  const ok = await storageSet('roll_pricing', PRICING);
+  const ok = await storageSet(unitScopedKey('roll_pricing'), PRICING);
   const el = document.getElementById('pricingStatus');
   el.textContent = ok ? 'Rates saved. New SKU selections from this point use them, according to whichever date they\'re applied to — existing saved batches keep their locked-in per-roll cost until re-selected.' : 'Kept for this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Use Export data to back it up.';
   el.className = ok ? 'status-msg' : 'status-msg err';
@@ -2834,7 +2878,7 @@ function updateMasterSku(id, field, value){
   renderMasterSkuTable();
 }
 async function saveMasterSkus(){
-  const ok = await storageSet('roll_master_skus', MASTER_SKUS);
+  const ok = await storageSet(unitScopedKey('roll_master_skus'), MASTER_SKUS);
   const el = document.getElementById('masterSkuStatus');
   el.textContent = ok ? 'SKU master saved.' : 'Kept for this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Use Export data to back it up.';
   el.className = ok ? 'status-msg' : 'status-msg err';
@@ -2868,7 +2912,7 @@ function updateRawMaterialMaster(id, field, value){
   else { m[field] = parseFloat(value)||0; }
 }
 async function saveRawMaterialMaster(){
-  const ok = await storageSet('raw_material_master', RAW_MATERIAL_MASTER);
+  const ok = await storageSet(unitScopedKey('raw_material_master'), RAW_MATERIAL_MASTER);
   const el = document.getElementById('rawMaterialStatus');
   el.textContent = ok ? 'Raw material rates saved.' : 'Kept for this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Use Export data to back it up.';
   el.className = ok ? 'status-msg' : 'status-msg err';
@@ -2877,8 +2921,8 @@ async function saveRawMaterialMaster(){
 }
 
 async function resetAllData(){
-  if(!confirm('This deletes ALL logged daily entries for everyone viewing this console. Continue?')) return;
-  const keys = await storageList('daily:');
+  if(!confirm('This deletes ALL logged daily entries for "'+currentUnit().name+'" — other units are not affected. Continue?')) return;
+  const keys = await listDailyKeysForCurrentUnit();
   await Promise.all(keys.map(k=>storageDelete(k)));
   ENTRIES = {};
   populateDashDateSelect();
@@ -2888,7 +2932,11 @@ async function resetAllData(){
 }
 
 /* ---------------- init ---------------- */
-async function init(){
+function populateUnitSelect(){
+  const sel = document.getElementById('unitSelect');
+  sel.innerHTML = UNITS.map(u=>`<option value="${u.id}" ${u.id===CURRENT_UNIT_ID?'selected':''}>${u.name}</option>`).join('');
+}
+async function loadAndRenderCurrentUnit(){
   document.getElementById('dashLoading').textContent = 'Checking storage...';
   await checkStorageAvailable();
   showStorageWarningIfNeeded();
@@ -2915,10 +2963,39 @@ async function init(){
 
   populateDashDateSelect();
   renderDashboard();
+  renderHistory();
 
   const defaultRange = getPresetRange('last7');
   document.getElementById('reportFrom').value = defaultRange.from;
   document.getElementById('reportTo').value = defaultRange.to;
+  document.getElementById('reportPreset').value = 'last7';
+}
+async function switchUnit(newUnitId){
+  if(!UNITS.find(u=>u.id===newUnitId) || newUnitId===CURRENT_UNIT_ID) return;
+  CURRENT_UNIT_ID = newUnitId;
+  try{ localStorage.setItem('dcc_current_unit', CURRENT_UNIT_ID); }catch(e){}
+  document.getElementById('unitLoadingNote').textContent = 'Switching to '+currentUnit().name+'...';
+
+  // reset every in-memory store to its default/seed shape first — otherwise, if the newly
+  // selected unit has no saved data yet, it would silently keep showing whatever the
+  // previously viewed unit had loaded, instead of correctly falling back to defaults.
+  SETTINGS = {...DEFAULT_SETTINGS};
+  PRICING = {...DEFAULT_PRICING};
+  MASTER_SKUS = SEED_MASTER_SKUS.map(s=>({...s}));
+  RAW_MATERIAL_MASTER = SEED_RAW_MATERIALS.map(m=>({...m}));
+  ENTRIES = {};
+
+  await loadAndRenderCurrentUnit();
+  document.getElementById('unitLoadingNote').textContent = '';
+}
+
+async function init(){
+  try{
+    const saved = localStorage.getItem('dcc_current_unit');
+    if(saved && UNITS.find(u=>u.id===saved)) CURRENT_UNIT_ID = saved;
+  }catch(e){}
+  populateUnitSelect();
+  await loadAndRenderCurrentUnit();
 }
 init();
 </script>
