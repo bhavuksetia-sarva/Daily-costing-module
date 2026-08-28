@@ -577,7 +577,7 @@
           <span class="status-msg" id="skuExportStatus"></span>
         </div>
         <pre id="skuExportPreview" style="display:none;margin-top:10px;padding:10px 14px;background:var(--panel3);border:1px solid var(--border-lt);border-radius:8px;font-family:var(--f-mono);font-size:11.5px;color:var(--text);white-space:pre-wrap;overflow-x:auto;"></pre>
-        <div class="note-box">Copies one row per SKU, all 6 columns — Product Name, backing 1, backing 2, density, Ex-Factory Price (GBP), Effective Date — tab-separated, ready to paste directly into "Product description" in the same order. Backing 1/2 are derived from the SKU master using the same classification the app already uses for pricing (nonwoven → "non woven", paper/Corefresh → "paper"), matching your sheet's existing style. Defaults to the £/roll figure for whatever period is selected above, so this works for a full month or a mid-month price change equally. Names are copied exactly as they appear in this app's SKU master — since some don't yet match your Google Sheet's naming, rename either side to line them up before pasting, or paste and fix afterward. "Custom" batches (no matched SKU) are skipped, since they have no product name to write against.</div>
+        <div class="note-box">Copies one row per SKU, all 6 columns — Product Name, backing 1, backing 2, density, Ex-Factory Price (GBP), Effective Date — tab-separated, ready to paste directly into "Product description" in the same order. Backing 1/2 are copied exactly as they're stored in the app's SKU master (e.g. "NONWOVEN YELLOW") — no relabeling. Effective Date is formatted to match your sheet's existing style (e.g. "01-Jan-26"). Defaults to the £/roll figure for whatever period is selected above, so this works for a full month or a mid-month price change equally. Names are copied exactly as they appear in this app's SKU master — since some don't yet match your Google Sheet's naming, rename either side to line them up before pasting, or paste and fix afterward. "Custom" batches (no matched SKU) are skipped, since they have no product name to write against.</div>
       </div>
 
       <div class="panel">
@@ -2607,18 +2607,13 @@ function renderReportSkuTable(skuAgg){
   body.innerHTML = trs + totalRow;
 }
 
-function simplifyBackingLabel(text){
-  // Mirrors classifyMaterial()'s categories, but in the plain lowercase style your
-  // "Product description" sheet already uses ("non woven", "paper") rather than the
-  // app's own descriptive text ("NONWOVEN YELLOW", "BROWN COREFRESH PAPER").
-  const info = classifyMaterial(text);
-  switch(info.type){
-    case 'nonwoven': return 'non woven';
-    case 'wilkiespaper': case 'paper': return 'paper';
-    case 'pefilm': return 'pe film';
-    case 'foil': return 'foil';
-    default: return text || '';
-  }
+function formatDateForSheet(dateStr){
+  // Matches your Google Sheet's existing Effective Date display style, e.g. "01-Jan-26"
+  const d = new Date(dateStr+'T00:00:00');
+  if(isNaN(d)) return dateStr;
+  const day = String(d.getDate()).padStart(2,'0');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return day+'-'+months[d.getMonth()]+'-'+String(d.getFullYear()).slice(-2);
 }
 function copySkuPricesForExport(){
   const effDate = document.getElementById('skuExportEffDate').value;
@@ -2632,13 +2627,14 @@ function copySkuPricesForExport(){
   if(rows.length===0){
     statusEl.textContent = 'Nothing to export — only unmatched "Custom" batches found in this period.'; statusEl.className = 'status-msg err'; return;
   }
+  const effDateFormatted = formatDateForSheet(effDate);
   const lines = rows.map(s=>{
     const perRollGBP = s.totalCostGBP / s.rollCount;
     const sku = s.skuId ? MASTER_SKUS.find(x=>x.id===s.skuId) : null;
-    const backing1 = sku ? simplifyBackingLabel(sku.front) : '';
-    const backing2 = sku ? simplifyBackingLabel(sku.back) : '';
+    const backing1 = sku ? (sku.front || '') : '';
+    const backing2 = sku ? (sku.back || '') : '';
     const density = sku ? sku.density : '';
-    return [s.name, backing1, backing2, density, perRollGBP.toFixed(3), effDate].join('\t');
+    return [s.name, backing1, backing2, density, perRollGBP.toFixed(3), effDateFormatted].join('\t');
   });
   const text = lines.join('\n');
   previewEl.textContent = text;
@@ -2646,7 +2642,7 @@ function copySkuPricesForExport(){
 
   const finish = (copied) => {
     statusEl.textContent = (copied ? 'Copied ' : 'Could not auto-copy to clipboard — select the text below and copy it manually. ') +
-      rows.length + ' row(s) for ' + effDate + '. Paste into "Product description" — Product Name, backing 1, backing 2, density, Ex-Factory Price (GBP), Effective Date, in that order.';
+      rows.length + ' row(s) for ' + effDateFormatted + '. Paste into "Product description" — Product Name, backing 1, backing 2, density, Ex-Factory Price (GBP), Effective Date, in that order.';
     statusEl.className = 'status-msg';
   };
   if(navigator.clipboard && navigator.clipboard.writeText){
