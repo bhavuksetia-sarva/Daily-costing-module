@@ -569,6 +569,15 @@
           </table>
         </div>
         <div class="note-box">Averages are weighted by actual production volume — total cost across every day in this period, divided by total rolls or kg — not a plain average of each day's rate. £/roll converts each day's cost using that day's own locked exchange rate, then sums, so a rate change partway through the period is reflected correctly rather than applied retroactively. Batches without a matching SKU (Custom) are grouped together under "Custom".</div>
+        <div class="hairline"></div>
+        <div class="date-picker-row" style="margin-bottom:0;">
+          <label for="skuExportEffDate">Effective date</label>
+          <input type="date" id="skuExportEffDate">
+          <button class="btn btn-sm" type="button" onclick="copySkuPricesForExport()">Copy for Product description</button>
+          <span class="status-msg" id="skuExportStatus"></span>
+        </div>
+        <pre id="skuExportPreview" style="display:none;margin-top:10px;padding:10px 14px;background:var(--panel3);border:1px solid var(--border-lt);border-radius:8px;font-family:var(--f-mono);font-size:11.5px;color:var(--text);white-space:pre-wrap;overflow-x:auto;"></pre>
+        <div class="note-box">Copies one row per SKU, all 6 columns — Product Name, backing 1, backing 2, density, Ex-Factory Price (GBP), Effective Date — tab-separated, ready to paste directly into "Product description" in the same order. Backing 1/2 are derived from the SKU master using the same classification the app already uses for pricing (nonwoven → "non woven", paper/Corefresh → "paper"), matching your sheet's existing style. Defaults to the £/roll figure for whatever period is selected above, so this works for a full month or a mid-month price change equally. Names are copied exactly as they appear in this app's SKU master — since some don't yet match your Google Sheet's naming, rename either side to line them up before pasting, or paste and fix afterward. "Custom" batches (no matched SKU) are skipped, since they have no product name to write against.</div>
       </div>
 
       <div class="panel">
@@ -2569,6 +2578,7 @@ function applyReportPreset(){
   }
   renderReports();
 }
+let LAST_REPORT_SKU_AGG = null;
 function renderReportSkuTable(skuAgg){
   const rows = Object.values(skuAgg).sort((a,b)=> b.rollCount - a.rollCount);
   const body = document.getElementById('reportSkuBody');
@@ -2595,6 +2605,55 @@ function renderReportSkuTable(skuAgg){
     <td style="font-family:var(--f-mono);">£${totalPerRollGBP.toFixed(2)}</td>
   </tr>` : '';
   body.innerHTML = trs + totalRow;
+}
+
+function simplifyBackingLabel(text){
+  // Mirrors classifyMaterial()'s categories, but in the plain lowercase style your
+  // "Product description" sheet already uses ("non woven", "paper") rather than the
+  // app's own descriptive text ("NONWOVEN YELLOW", "BROWN COREFRESH PAPER").
+  const info = classifyMaterial(text);
+  switch(info.type){
+    case 'nonwoven': return 'non woven';
+    case 'wilkiespaper': case 'paper': return 'paper';
+    case 'pefilm': return 'pe film';
+    case 'foil': return 'foil';
+    default: return text || '';
+  }
+}
+function copySkuPricesForExport(){
+  const effDate = document.getElementById('skuExportEffDate').value;
+  const statusEl = document.getElementById('skuExportStatus');
+  const previewEl = document.getElementById('skuExportPreview');
+  if(!effDate){ statusEl.textContent = 'Pick an effective date first.'; statusEl.className = 'status-msg err'; return; }
+  if(!LAST_REPORT_SKU_AGG || Object.keys(LAST_REPORT_SKU_AGG).length===0){
+    statusEl.textContent = 'No roll SKU data for the selected period.'; statusEl.className = 'status-msg err'; return;
+  }
+  const rows = Object.values(LAST_REPORT_SKU_AGG).filter(s=>s.name!=='Custom' && s.rollCount>0);
+  if(rows.length===0){
+    statusEl.textContent = 'Nothing to export — only unmatched "Custom" batches found in this period.'; statusEl.className = 'status-msg err'; return;
+  }
+  const lines = rows.map(s=>{
+    const perRollGBP = s.totalCostGBP / s.rollCount;
+    const sku = s.skuId ? MASTER_SKUS.find(x=>x.id===s.skuId) : null;
+    const backing1 = sku ? simplifyBackingLabel(sku.front) : '';
+    const backing2 = sku ? simplifyBackingLabel(sku.back) : '';
+    const density = sku ? sku.density : '';
+    return [s.name, backing1, backing2, density, perRollGBP.toFixed(3), effDate].join('\t');
+  });
+  const text = lines.join('\n');
+  previewEl.textContent = text;
+  previewEl.style.display = 'block';
+
+  const finish = (copied) => {
+    statusEl.textContent = (copied ? 'Copied ' : 'Could not auto-copy to clipboard — select the text below and copy it manually. ') +
+      rows.length + ' row(s) for ' + effDate + '. Paste into "Product description" — Product Name, backing 1, backing 2, density, Ex-Factory Price (GBP), Effective Date, in that order.';
+    statusEl.className = 'status-msg';
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>finish(true)).catch(()=>finish(false));
+  } else {
+    finish(false);
+  }
 }
 
 function renderReports(){
@@ -2627,7 +2686,7 @@ function renderReports(){
     const gbpRate = (ENTRIES[d].gbpRateUsed) || SETTINGS.gbpRate;
     c.underlay.batches.forEach(b=>{
       const key = b.skuId || '__custom__';
-      if(!skuAgg[key]) skuAgg[key] = {name: b.skuId ? b.skuName : 'Custom', rollCount:0, outputKg:0, materialsCost:0, processCost:0, totalCost:0, totalCostGBP:0};
+      if(!skuAgg[key]) skuAgg[key] = {name: b.skuId ? b.skuName : 'Custom', skuId: b.skuId || null, rollCount:0, outputKg:0, materialsCost:0, processCost:0, totalCost:0, totalCostGBP:0};
       const s = skuAgg[key];
       s.rollCount += b.rollCount||0; s.outputKg += b.outputKg||0;
       s.materialsCost += b.materialsCost||0; s.processCost += b.processCost||0; s.totalCost += b.totalCost||0;
@@ -2645,7 +2704,9 @@ function renderReports(){
     agg.underlay.binderQtyKg += c.underlay.binderQtyKg||0; agg.underlay.nonBinderQtyKg += c.underlay.nonBinderQtyKg||0; agg.underlay.nonBinderCost += c.underlay.nonBinderCost||0;
     agg.totalCost += c.totalCost; agg.totalCostExclRaw += c.totalCostExclRaw;
   });
+  LAST_REPORT_SKU_AGG = skuAgg;
   renderReportSkuTable(skuAgg);
+  if(!document.getElementById('skuExportEffDate').value){ document.getElementById('skuExportEffDate').value = from; }
 
   const sOut = agg.sheets.outputKg, uOut = agg.underlay.outputKg;
   const sPerKg = sOut>0 ? agg.sheets.total/sOut : 0;
