@@ -51,6 +51,7 @@
   .hairline{height:1px;background:var(--border);margin:16px 0;}
 
   .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px;}
+  .kpi-row.kpi-row-2col{grid-template-columns:repeat(2,1fr);}
   .kpi{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden;}
   .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;}
   .kpi.k-amber::before{background:var(--amber);}
@@ -284,7 +285,7 @@
           </div>
           <div class="stackbar" id="sheetStackBar"></div>
         </div>
-        <div class="stack-block" style="margin-bottom:0;">
+        <div class="stack-block" style="margin-bottom:0;" id="underlayStackBlock">
           <div class="stack-head">
             <span class="stack-title steel">Underlay Line</span>
             <span class="stack-total" id="underlayStackTotal"></span>
@@ -306,7 +307,7 @@
               <tr>
                 <th>Category</th>
                 <th class="col-amber">Sheets ₹</th><th class="col-amber">Sheets ₹/kg</th><th class="col-amber">Sheets %</th>
-                <th class="col-steel">Underlay ₹</th><th class="col-steel">Underlay ₹/kg</th><th class="col-steel">Underlay %</th>
+                <th class="col-steel comp-underlay-th">Underlay ₹</th><th class="col-steel comp-underlay-th">Underlay ₹/kg</th><th class="col-steel comp-underlay-th">Underlay %</th>
               </tr>
             </thead>
             <tbody id="compositionTableBody"></tbody>
@@ -378,7 +379,7 @@
         <div class="hairline"></div>
         <div class="field-grid">
           <div class="field"><label>Blocks made for Sheets line <span class="unit">(kg)</span></label><input type="number" id="s_sheetBlocksKg" min="0" step="any"></div>
-          <div class="field"><label>Cylindrical blocks for Underlay <span class="unit">(kg)</span></label><input type="number" id="s_underlayBlocksKg" min="0" step="any"></div>
+          <div class="field" id="underlayBlocksField"><label>Cylindrical blocks for Underlay <span class="unit">(kg)</span></label><input type="number" id="s_underlayBlocksKg" min="0" step="any"></div>
         </div>
         <div class="note-box">Raw material is now entered directly under each line below, since the two block types are made on separate machines and you know exact consumption for each. These two weights only set the split ratio for labor, electricity, and overhead — costs that are genuinely shared between the lines.</div>
       </div>
@@ -486,7 +487,7 @@
           <thead>
             <tr>
               <th>Date</th><th>Sheets out (kg)</th><th>Sheets avg ₹/kg</th><th>Sheets conv. ₹/kg</th><th>Sheets eff. %</th>
-              <th>Underlay out (kg)</th><th>Underlay avg ₹/kg</th><th>Underlay conv. ₹/kg</th><th>Underlay eff. %</th>
+              <th id="histThUnderlay1">Underlay out (kg)</th><th id="histThUnderlay2">Underlay avg ₹/kg</th><th id="histThUnderlay3">Underlay conv. ₹/kg</th><th id="histThUnderlay4">Underlay eff. %</th>
               <th>Total cost excl. raw &amp; consum. (₹)</th><th></th>
             </tr>
           </thead>
@@ -568,7 +569,7 @@
         </div>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="reportRollSkuPanel">
         <h2>Roll SKU cost &mdash; <span class="accent">weighted average for this period</span></h2>
         <div class="tbl-wrap">
           <table id="reportSkuTable">
@@ -598,7 +599,7 @@
               <tr>
                 <th>Category</th>
                 <th class="col-amber">Sheets ₹</th><th class="col-amber">Sheets ₹/kg</th><th class="col-amber">Sheets %</th>
-                <th class="col-steel">Underlay ₹</th><th class="col-steel">Underlay ₹/kg</th><th class="col-steel">Underlay %</th>
+                <th class="col-steel comp-underlay-th">Underlay ₹</th><th class="col-steel comp-underlay-th">Underlay ₹/kg</th><th class="col-steel comp-underlay-th">Underlay %</th>
               </tr>
             </thead>
             <tbody id="reportCompositionBody"></tbody>
@@ -688,6 +689,21 @@
     </div>
 
     <div class="panel">
+      <h2>Production lines <span class="accent">&mdash; for this unit</span></h2>
+      <div class="field-grid">
+        <div class="field">
+          <label>Underlay line</label>
+          <select id="set_hasUnderlay" onchange="setUnitHasUnderlay(this.value==='yes')">
+            <option value="yes">This unit has an Underlay line</option>
+            <option value="no">Sheets only — no Underlay line</option>
+          </select>
+        </div>
+      </div>
+      <div class="note-box">Turning this off hides every Underlay-specific screen for this unit — Daily Log's Peeling/Lamination stage, roll SKU pricing, and all Underlay figures on Dashboard, History, and Reports — and shared labor/electricity/overhead go 100% to Sheets. This can be switched back on later without losing any data: days already logged keep whatever they have, and new Underlay data just resumes flowing in from whenever you re-enable it.</div>
+    </div>
+
+    <div id="underlaySettingsPanels">
+    <div class="panel">
       <h2>Roll lamination &amp; packing rates</h2>
       <div class="field-grid" id="rateFieldsGrid_pricing"></div>
       <div class="btn-row"><button class="btn btn-primary" onclick="savePricing()">Save rates</button></div>
@@ -709,6 +725,7 @@
       </div>
       <div class="note-box">Front/back backing text is matched by keyword: "NONWOVEN" (+ "PRINT" for printed rate), "COREFRESH" (priced as Wilkies paper, + "WHITE" for the white variant — checked before the generic paper match, so any name containing both still gets the Wilkies rate), "PAPER" (+ "WHITE" for white rate), "PE FILM", or "FOIL". Outer bag is matched by "PRINTED" vs everything else (clear/color bag rate). Weight/roll = Length × Width × Thickness(m) × Density.</div>
       <div class="status-msg" id="masterSkuStatus"></div>
+    </div>
     </div>
 
     <div class="panel" id="storageWarningPanel" style="display:none;border-color:var(--bad);">
@@ -1063,14 +1080,77 @@ let LAST_STORAGE_ERROR = '';
 // namespaced keys (e.g. "settings:unit2", "daily:unit2:2026-08-25") so a change to
 // one unit's rates, SKUs, or logs can never affect another's.
 const UNITS = [
-  { id: 'unit1', name: 'Sarva Foam — Rebonded & Underlay Division', hasUnderlay: true },
-  { id: 'unit2', name: 'Unit 2', hasUnderlay: true },
-  { id: 'unit3', name: 'Unit 3', hasUnderlay: true },
-  { id: 'unit4', name: 'Unit 4', hasUnderlay: true }
+  { id: 'unit1', name: 'Silvassa', hasUnderlay: true },
+  { id: 'unit2', name: 'Dadri', hasUnderlay: true },
+  { id: 'unit3', name: 'Hosur', hasUnderlay: true },
+  { id: 'unit4', name: 'Kelamanglam', hasUnderlay: true }
 ];
 const LEGACY_UNIT_ID = 'unit1';
 let CURRENT_UNIT_ID = LEGACY_UNIT_ID;
 function currentUnit(){ return UNITS.find(u=>u.id===CURRENT_UNIT_ID) || UNITS[0]; }
+async function loadUnitConfig(){
+  const raw = await storageGet(unitScopedKey('unit_config'));
+  const u = currentUnit();
+  if(raw){
+    try{ const cfg = JSON.parse(raw); u.hasUnderlay = cfg.hasUnderlay !== false; }catch(e){ u.hasUnderlay = true; }
+  } else {
+    u.hasUnderlay = true; // default — matches every unit's behavior before this setting existed
+  }
+}
+async function setUnitHasUnderlay(val){
+  const u = currentUnit();
+  u.hasUnderlay = !!val;
+  await storageSet(unitScopedKey('unit_config'), {hasUnderlay: u.hasUnderlay});
+  applyUnderlayVisibility();
+  renderDashboard();
+  renderHistory();
+  if(document.getElementById('view-reports').classList.contains('active')) renderReports();
+  updateLivePreview();
+}
+function toggleKpiCard(valueElId, show){
+  const el = document.getElementById(valueElId);
+  const card = el && el.closest ? el.closest('.kpi') : null;
+  if(card) card.style.display = show ? '' : 'none';
+}
+function applyUnderlayVisibility(){
+  const has = currentUnit().hasUnderlay;
+
+  const stageUnderlay = document.getElementById('stage-underlay');
+  if(stageUnderlay) stageUnderlay.style.display = has ? '' : 'none';
+  const blocksField = document.getElementById('underlayBlocksField');
+  if(blocksField) blocksField.style.display = has ? '' : 'none';
+
+  const settingsPanels = document.getElementById('underlaySettingsPanels');
+  if(settingsPanels) settingsPanels.style.display = has ? '' : 'none';
+  const hasSelect = document.getElementById('set_hasUnderlay');
+  if(hasSelect) hasSelect.value = has ? 'yes' : 'no';
+
+  ['kpiUnderlayCost','kpiUnderlayRawExclBinder','kpiUnderlayConversion','kpiUnderlayEfficiency'].forEach(id=>toggleKpiCard(id, has));
+  const kpiSheetCostEl = document.getElementById('kpiSheetCost');
+  const dashRow1 = kpiSheetCostEl && kpiSheetCostEl.closest ? kpiSheetCostEl.closest('.kpi-row') : null;
+  const kpiSheetConvEl = document.getElementById('kpiSheetConversion');
+  const dashRow2 = kpiSheetConvEl && kpiSheetConvEl.closest ? kpiSheetConvEl.closest('.kpi-row') : null;
+  [dashRow1, dashRow2].forEach(row=>{ if(row) row.classList.toggle('kpi-row-2col', !has); });
+
+  const stackBlock = document.getElementById('underlayStackBlock');
+  if(stackBlock) stackBlock.style.display = has ? '' : 'none';
+
+  ['repUnderlayCost','repUnderlayRawExclBinder','repUnderlayConversion','repUnderlayEfficiency'].forEach(id=>toggleKpiCard(id, has));
+  const repSheetCostEl = document.getElementById('repSheetCost');
+  const repRow1 = repSheetCostEl && repSheetCostEl.closest ? repSheetCostEl.closest('.kpi-row') : null;
+  const repSheetConvEl = document.getElementById('repSheetConversion');
+  const repRow2 = repSheetConvEl && repSheetConvEl.closest ? repSheetConvEl.closest('.kpi-row') : null;
+  [repRow1, repRow2].forEach(row=>{ if(row) row.classList.toggle('kpi-row-2col', !has); });
+
+  const rollSkuPanel = document.getElementById('reportRollSkuPanel');
+  if(rollSkuPanel) rollSkuPanel.style.display = has ? '' : 'none';
+
+  ['histThUnderlay1','histThUnderlay2','histThUnderlay3','histThUnderlay4'].forEach(id=>{
+    const th = document.getElementById(id);
+    if(th) th.style.display = has ? '' : 'none';
+  });
+  document.querySelectorAll('.comp-underlay-th').forEach(th=>{ th.style.display = has ? '' : 'none'; });
+}
 function unitScopedKey(baseKey){
   return CURRENT_UNIT_ID===LEGACY_UNIT_ID ? baseKey : baseKey+':'+CURRENT_UNIT_ID;
 }
@@ -1301,8 +1381,15 @@ function computeDay(e, settings, materialRates, reclaimRate){
   const sharedOther = e.s_dieselCost + e.s_maintCost + (e.s_woodKg||0)*rateAt(settings.woodRate, entryDate);
 
   const totalBlocks = e.s_sheetBlocksKg + e.s_underlayBlocksKg;
-  const sheetRatio = totalBlocks>0 ? e.s_sheetBlocksKg/totalBlocks : 0;
-  const underlayRatio = totalBlocks>0 ? e.s_underlayBlocksKg/totalBlocks : 0;
+  let sheetRatio, underlayRatio;
+  if(!currentUnit().hasUnderlay){
+    // Sheets-only unit — shared labor/electricity/overhead/other always goes 100% to Sheets,
+    // regardless of any stray underlay-block figure that might exist in older/imported data.
+    sheetRatio = 1; underlayRatio = 0;
+  } else {
+    sheetRatio = totalBlocks>0 ? e.s_sheetBlocksKg/totalBlocks : 0;
+    underlayRatio = totalBlocks>0 ? e.s_underlayBlocksKg/totalBlocks : 0;
+  }
 
   const dailyOverhead = (rateAt(settings.rent,entryDate)+rateAt(settings.admin,entryDate)+rateAt(settings.dep,entryDate)+rateAt(settings.other,entryDate)) / Math.max(rateAt(settings.prodDays,entryDate),1);
 
@@ -2122,30 +2209,34 @@ function compositionTooltip(catObj, total){
 }
 
 function renderCompositionTableInto(bodyId, c){
+  const has = currentUnit().hasUnderlay;
   const labels = [['raw','Raw Material'],['labor','Labor'],['elec','Electricity'],['consum','Consumables (lamination)'],['other','Other Direct'],['oh','Overhead']];
   const sTotal = c.sheets.total, uTotal = c.underlay.total;
   const sOut = c.sheets.outputKg, uOut = c.underlay.outputKg;
   const pct = (v,total) => total>0 ? ((v/total)*100).toFixed(1)+'%' : '—';
   const perKg = (v,out) => out>0 ? fmtMoney(v/out) : '—';
+  const colCount = has ? 7 : 4;
   const rows = labels.map(([key,label])=>{
     const sVal = c.sheets[key]||0, uVal = c.underlay[key]||0;
-    if(sVal<=0 && uVal<=0) return '';
+    if(sVal<=0 && (!has || uVal<=0)) return '';
+    const underlayTds = has ? `
+      <td class="num">${uVal>0?fmtMoney(uVal):'—'}</td>
+      <td class="num">${uVal>0?perKg(uVal,uOut):'—'}</td>
+      <td class="num">${uVal>0?pct(uVal,uTotal):'—'}</td>` : '';
     return `<tr>
       <td>${label}</td>
       <td class="num">${sVal>0?fmtMoney(sVal):'—'}</td>
       <td class="num">${sVal>0?perKg(sVal,sOut):'—'}</td>
-      <td class="num">${sVal>0?pct(sVal,sTotal):'—'}</td>
-      <td class="num">${uVal>0?fmtMoney(uVal):'—'}</td>
-      <td class="num">${uVal>0?perKg(uVal,uOut):'—'}</td>
-      <td class="num">${uVal>0?pct(uVal,uTotal):'—'}</td>
+      <td class="num">${sVal>0?pct(sVal,sTotal):'—'}</td>${underlayTds}
     </tr>`;
   }).join('');
+  const underlayTotalTds = has ? `
+    <td class="num">${fmtMoney(uTotal)}</td><td class="num">${perKg(uTotal,uOut)}</td><td class="num">100%</td>` : '';
   const totalRow = `<tr class="total-row">
     <td>Total</td>
-    <td class="num">${fmtMoney(sTotal)}</td><td class="num">${perKg(sTotal,sOut)}</td><td class="num">100%</td>
-    <td class="num">${fmtMoney(uTotal)}</td><td class="num">${perKg(uTotal,uOut)}</td><td class="num">100%</td>
+    <td class="num">${fmtMoney(sTotal)}</td><td class="num">${perKg(sTotal,sOut)}</td><td class="num">100%</td>${underlayTotalTds}
   </tr>`;
-  document.getElementById(bodyId).innerHTML = (rows||'<tr><td colspan="7" class="batch-empty">No cost recorded.</td></tr>') + (sTotal>0||uTotal>0 ? totalRow : '');
+  document.getElementById(bodyId).innerHTML = (rows||`<tr><td colspan="${colCount}" class="batch-empty">No cost recorded.</td></tr>`) + ((sTotal>0||(has&&uTotal>0)) ? totalRow : '');
 }
 function renderCompositionTable(c){
   renderCompositionTableInto('compositionTableBody', c);
@@ -2332,6 +2423,7 @@ function svgStackedBarChart(containerId, labels, series){
 }
 
 function renderTrendCharts(){
+  const has = currentUnit().hasUnderlay;
   const dates = Object.keys(ENTRIES).sort().slice(-30);
   const labels = dates.map(d=>d.slice(5));
   const sheetVals = [], underlayVals = [], sheetConvVals = [], underlayConvVals = [];
@@ -2344,14 +2436,12 @@ function renderTrendCharts(){
     underlayConvVals.push(Number(c.underlay.conversionPerKg.toFixed(2)));
   });
 
-  svgLineChart('trendChart', labels, [
-    {name:'Sheets avg ₹/kg', data:sheetVals, color:'#e8a33d'},
-    {name:'Underlay avg ₹/kg', data:underlayVals, color:'#5b8aa6'}
-  ]);
-  svgLineChart('outputChart', labels, [
-    {name:'Sheets conversion ₹/kg', data:sheetConvVals, color:'#e8a33d'},
-    {name:'Underlay conversion ₹/kg', data:underlayConvVals, color:'#5b8aa6'}
-  ]);
+  const trendSeries = [{name:'Sheets avg ₹/kg', data:sheetVals, color:'#e8a33d'}];
+  if(has) trendSeries.push({name:'Underlay avg ₹/kg', data:underlayVals, color:'#5b8aa6'});
+  svgLineChart('trendChart', labels, trendSeries);
+  const convSeries = [{name:'Sheets conversion ₹/kg', data:sheetConvVals, color:'#e8a33d'}];
+  if(has) convSeries.push({name:'Underlay conversion ₹/kg', data:underlayConvVals, color:'#5b8aa6'});
+  svgLineChart('outputChart', labels, convSeries);
 }
 
 document.getElementById('dashDate').addEventListener('change', renderDashboard);
@@ -2523,19 +2613,21 @@ function renderHistory(){
     return;
   }
   document.getElementById('historyEmpty').style.display='none';
+  const has = currentUnit().hasUnderlay;
   const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
   body.innerHTML = dates.map(d=>{
     const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{}, (ledger.ledgerByDate[d]||{}).reclaimRate);
+    const underlayCells = has ? `
+      <td>${fmtKg(c.underlay.outputKg)}</td>
+      <td>${fmtMoney(c.underlay.perKg)}</td>
+      <td>${fmtMoney(c.underlay.conversionPerKg)}</td>
+      <td>${c.underlay.efficiencyPct.toFixed(1)}%</td>` : '';
     return `<tr>
       <td>${d}</td>
       <td>${fmtKg(c.sheets.outputKg)}</td>
       <td>${fmtMoney(c.sheets.perKg)}</td>
       <td>${fmtMoney(c.sheets.conversionPerKg)}</td>
-      <td>${c.sheets.efficiencyPct.toFixed(1)}%</td>
-      <td>${fmtKg(c.underlay.outputKg)}</td>
-      <td>${fmtMoney(c.underlay.perKg)}</td>
-      <td>${fmtMoney(c.underlay.conversionPerKg)}</td>
-      <td>${c.underlay.efficiencyPct.toFixed(1)}%</td>
+      <td>${c.sheets.efficiencyPct.toFixed(1)}%</td>${underlayCells}
       <td>${fmtMoney(c.totalCostExclRaw)}</td>
       <td>
         <button class="link-btn" onclick="editFromHistory('${d}')">Edit</button>
@@ -2697,6 +2789,7 @@ function copySkuPricesForExport(){
 }
 
 function renderReports(){
+  const hasU = currentUnit().hasUnderlay;
   const from = document.getElementById('reportFrom').value;
   const to = document.getElementById('reportTo').value;
   if(!from || !to){ return; }
@@ -2786,14 +2879,12 @@ function renderReports(){
     sheetConvVals.push(Number(c.sheets.conversionPerKg.toFixed(2)));
     underlayConvVals.push(Number(c.underlay.conversionPerKg.toFixed(2)));
   });
-  svgLineChart('reportTrendChart', labels, [
-    {name:'Sheets avg ₹/kg', data:sheetVals, color:'#e8a33d'},
-    {name:'Underlay avg ₹/kg', data:underlayVals, color:'#5b8aa6'}
-  ]);
-  svgLineChart('reportOutputChart', labels, [
-    {name:'Sheets conversion ₹/kg', data:sheetConvVals, color:'#e8a33d'},
-    {name:'Underlay conversion ₹/kg', data:underlayConvVals, color:'#5b8aa6'}
-  ]);
+  const repTrendSeries = [{name:'Sheets avg ₹/kg', data:sheetVals, color:'#e8a33d'}];
+  if(hasU) repTrendSeries.push({name:'Underlay avg ₹/kg', data:underlayVals, color:'#5b8aa6'});
+  svgLineChart('reportTrendChart', labels, repTrendSeries);
+  const repConvSeries = [{name:'Sheets conversion ₹/kg', data:sheetConvVals, color:'#e8a33d'}];
+  if(hasU) repConvSeries.push({name:'Underlay conversion ₹/kg', data:underlayConvVals, color:'#5b8aa6'});
+  svgLineChart('reportOutputChart', labels, repConvSeries);
 }
 
 function editFromHistory(d){
@@ -2943,14 +3034,18 @@ async function loadAndRenderCurrentUnit(){
 
   document.getElementById('dashLoading').textContent = 'Loading...';
   if(STORAGE_OK){
+    await loadUnitConfig();
     await loadSettings();
     await loadPricing();
     await loadMasterSkus();
     await loadRawMaterialMaster();
     await loadAllEntries();
+  } else {
+    currentUnit().hasUnderlay = true;
   }
   document.getElementById('dashLoading').textContent = '';
 
+  applyUnderlayVisibility();
   renderRateFieldContainers();
   fillSettingsForm();
   fillPricingForm();
