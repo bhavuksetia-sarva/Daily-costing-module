@@ -1381,15 +1381,14 @@ function computeDay(e, settings, materialRates, reclaimRate){
   const sharedOther = e.s_dieselCost + e.s_maintCost + (e.s_woodKg||0)*rateAt(settings.woodRate, entryDate);
 
   const totalBlocks = e.s_sheetBlocksKg + e.s_underlayBlocksKg;
-  let sheetRatio, underlayRatio;
-  if(!currentUnit().hasUnderlay){
-    // Sheets-only unit — shared labor/electricity/overhead/other always goes 100% to Sheets,
-    // regardless of any stray underlay-block figure that might exist in older/imported data.
-    sheetRatio = 1; underlayRatio = 0;
-  } else {
-    sheetRatio = totalBlocks>0 ? e.s_sheetBlocksKg/totalBlocks : 0;
-    underlayRatio = totalBlocks>0 ? e.s_underlayBlocksKg/totalBlocks : 0;
-  }
+  // No toggle-based override here — this always reflects the day's real, saved block weights.
+  // For a Sheets-only unit, the Underlay field is simply never entered (hidden in the UI), so
+  // this naturally resolves to 100% Sheets on its own — no special-casing needed. And for a unit
+  // that had real Underlay history before switching off, those old days keep their true split
+  // regardless of today's toggle, since the toggle only ever controls what's displayed, never
+  // what's calculated.
+  const sheetRatio = totalBlocks>0 ? e.s_sheetBlocksKg/totalBlocks : 0;
+  const underlayRatio = totalBlocks>0 ? e.s_underlayBlocksKg/totalBlocks : 0;
 
   const dailyOverhead = (rateAt(settings.rent,entryDate)+rateAt(settings.admin,entryDate)+rateAt(settings.dep,entryDate)+rateAt(settings.other,entryDate)) / Math.max(rateAt(settings.prodDays,entryDate),1);
 
