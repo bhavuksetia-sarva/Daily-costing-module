@@ -2700,7 +2700,15 @@ function renderInventory(){
 }
 
 /* ---------------- reports (date-range aggregation) ---------------- */
-function toISODate(d){ return d.toISOString().slice(0,10); }
+function toISODate(d){
+  // Uses LOCAL date components throughout — never converts through UTC. The previous
+  // implementation (d.toISOString()) rolls the date back a day for anyone in a positive UTC
+  // offset (e.g. IST, UTC+5:30): local midnight becomes the previous day once read back as
+  // UTC, so addDays() could get permanently stuck on the same date and loop forever — exactly
+  // the same class of bug already fixed once in this app for Excel date parsing.
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
 function addDays(dateStr, n){ const d = new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return toISODate(d); }
 function getPresetRange(preset){
   const today = new Date();
@@ -2860,9 +2868,13 @@ function computeWeeklyAnalysis(dates, ledger, from, to){
   // missing calendar days within the selected range that have no logged entry at all
   const missing = [];
   let cursor = from;
-  while(cursor<=to){
+  let safety = 0; // hard cap — guarantees this can never freeze the tab even in an unforeseen edge case
+  while(cursor<=to && safety<3660){
     if(!ENTRIES[cursor]) missing.push(cursor);
-    cursor = addDays(cursor,1);
+    const next = addDays(cursor,1);
+    if(next<=cursor) break; // date failed to advance — stop rather than loop
+    cursor = next;
+    safety++;
   }
 
   const warningDays = rows.filter(r=>r.ledgerWarning).map(r=>r.date);
