@@ -315,15 +315,13 @@
         </div>
       </div>
 
-      <div class="two-col">
-        <div class="panel">
-          <h2>Cost / kg trend <span class="accent">&mdash; last 30 entries</span></h2>
-          <div class="chart-wrap" id="trendChart"></div>
-        </div>
-        <div class="panel">
-          <h2>Conversion cost / kg trend <span class="accent">&mdash; last 30 entries</span></h2>
-          <div class="chart-wrap" id="outputChart"></div>
-        </div>
+      <div class="panel">
+        <h2>Cost / kg trend <span class="accent">&mdash; last 30 entries</span></h2>
+        <div class="chart-wrap" id="trendChart"></div>
+      </div>
+      <div class="panel">
+        <h2>Conversion cost / kg trend <span class="accent">&mdash; last 30 entries</span></h2>
+        <div class="chart-wrap" id="outputChart"></div>
       </div>
     </div>
   </section>
@@ -2272,21 +2270,23 @@ function renderSkuTable(c, gbpRate){
     </tr>`);
   }
   let rollOutKg=0, rollTotal=0, rollCount=0;
-  c.underlay.batches.forEach(b=>{
-    rollOutKg += b.outputKg; rollTotal += b.totalCost; rollCount += (b.rollCount||0);
-    rows.push(`<tr>
-      <td class="line-steel" style="color:var(--steel);">Roll</td>
-      <td>${b.skuName || 'Custom'}</td>
-      <td>${fmtKg(b.outputKg)}${b.rollCount?' &middot; '+b.rollCount+' rolls':''}</td>
-      <td>${fmtMoney(b.materialsCost)}</td>
-      <td>${fmtMoney(b.processCost)}</td>
-      <td class="cost">${fmtMoney(b.totalCost)}</td>
-      <td class="cost">${fmtMoney(b.costPerKg)}</td>
-      <td>${b.costPerRoll!=null ? fmtMoney(b.costPerRoll) : '&mdash;'}</td>
-      <td>${b.costPerRoll!=null ? fmtGBP(b.costPerRoll, gbpRate) : '&mdash;'}</td>
-    </tr>`);
-  });
-  if(c.underlay.batches.length>1){
+  if(currentUnit().hasUnderlay){
+    c.underlay.batches.forEach(b=>{
+      rollOutKg += b.outputKg; rollTotal += b.totalCost; rollCount += (b.rollCount||0);
+      rows.push(`<tr>
+        <td class="line-steel" style="color:var(--steel);">Roll</td>
+        <td>${b.skuName || 'Custom'}</td>
+        <td>${fmtKg(b.outputKg)}${b.rollCount?' &middot; '+b.rollCount+' rolls':''}</td>
+        <td>${fmtMoney(b.materialsCost)}</td>
+        <td>${fmtMoney(b.processCost)}</td>
+        <td class="cost">${fmtMoney(b.totalCost)}</td>
+        <td class="cost">${fmtMoney(b.costPerKg)}</td>
+        <td>${b.costPerRoll!=null ? fmtMoney(b.costPerRoll) : '&mdash;'}</td>
+        <td>${b.costPerRoll!=null ? fmtGBP(b.costPerRoll, gbpRate) : '&mdash;'}</td>
+      </tr>`);
+    });
+  }
+  if(currentUnit().hasUnderlay && c.underlay.batches.length>1){
     const blendedPerRoll = rollCount>0 ? rollTotal/rollCount : null;
     rows.push(`<tr class="total-row">
       <td class="line-steel" style="color:var(--steel);">Roll</td>
