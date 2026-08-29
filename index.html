@@ -614,46 +614,34 @@
         <div class="chart-wrap" id="reportOutputChart"></div>
       </div>
 
-      <div class="panel" id="lineAnalysisPanel">
-        <h2>Day-by-day analysis <span class="accent">&mdash; conversion cost per kg vs. this period's own average, by line</span></h2>
-
-        <div class="stack-block">
-          <div class="stack-head">
-            <span class="stack-title amber">Sheets</span>
-          </div>
-          <div id="sheetsAnalysisSummary" style="margin-bottom:14px;"></div>
-          <div class="tbl-wrap">
-            <table id="sheetsAnalysisTable">
-              <thead>
-                <tr><th>Date</th><th>Conversion ₹/kg</th><th>vs. period avg</th><th>Efficiency</th><th>Driving factor</th></tr>
-              </thead>
-              <tbody id="sheetsAnalysisBody"></tbody>
-            </table>
-          </div>
-          <div id="sheetsAnalysisNotes"></div>
+      <div class="panel">
+        <h2>Day-by-day analysis &mdash; <span class="accent">Sheets</span></h2>
+        <div id="analysisSummarySheets" style="margin-bottom:14px;"></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr><th>Date</th><th>Conversion ₹/kg</th><th>vs. period avg</th><th>Efficiency</th><th>Driving factor</th></tr>
+            </thead>
+            <tbody id="analysisBodySheets"></tbody>
+          </table>
         </div>
-
-        <div class="hairline"></div>
-
-        <div class="stack-block" id="underlayAnalysisBlock" style="margin-bottom:0;">
-          <div class="stack-head">
-            <span class="stack-title steel">Underlay</span>
-          </div>
-          <div id="underlayAnalysisSummary" style="margin-bottom:14px;"></div>
-          <div class="tbl-wrap">
-            <table id="underlayAnalysisTable">
-              <thead>
-                <tr><th>Date</th><th>Conversion ₹/kg</th><th>vs. period avg</th><th>Efficiency</th><th>Driving factor</th></tr>
-              </thead>
-              <tbody id="underlayAnalysisBody"></tbody>
-            </table>
-          </div>
-          <div id="underlayAnalysisNotes"></div>
-        </div>
-
-        <div id="analysisMissingNote"></div>
-        <div class="note-box">"Conversion ₹/kg" is labor + electricity + overhead for that line only, excluding raw material (and, for Underlay, excluding lamination consumables too) — same definition as the Conversion Cost KPI above. "Driving factor" is whichever conversion category (labor, electricity, other direct, overhead) deviated furthest from this period's own average for that line, in the same direction as that day's conversion cost — i.e. what mainly pushed an expensive day's conversion cost up, or a cheap day's down. Efficiency is shown alongside for context. All comparisons are against this period's own weighted average for that line, not a fixed target, and the two lines are never blended together.</div>
+        <div id="analysisNotesSheets"></div>
       </div>
+      <div class="panel" id="analysisUnderlayPanel">
+        <h2>Day-by-day analysis &mdash; <span class="accent">Underlay</span></h2>
+        <div id="analysisSummaryUnderlay" style="margin-bottom:14px;"></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr><th>Date</th><th>Conversion ₹/kg</th><th>vs. period avg</th><th>Efficiency</th><th>Driving factor</th></tr>
+            </thead>
+            <tbody id="analysisBodyUnderlay"></tbody>
+          </table>
+        </div>
+        <div id="analysisNotesUnderlay"></div>
+      </div>
+      <div class="note-box" id="analysisMissingNote"></div>
+      <div class="note-box">Each line is analyzed independently — no blended figure. "Conversion ₹/kg" is labor + electricity + overhead (+ other direct costs), excluding raw material and, for Underlay, lamination consumables — the cost of running the line itself, not what went into it. "Driving factor" is whichever of those categories deviated furthest from that line's own period average, in the same direction as that day's overall conversion cost — i.e. what mainly pushed an expensive day up, or a cheap day down. All comparisons are against each line's own weighted average for this period, not a fixed target.</div>
     </div>
   </section>
 
@@ -1183,9 +1171,8 @@ function applyUnderlayVisibility(){
 
   const rollSkuPanel = document.getElementById('reportRollSkuPanel');
   if(rollSkuPanel) rollSkuPanel.style.display = has ? '' : 'none';
-
-  const underlayAnalysisBlock = document.getElementById('underlayAnalysisBlock');
-  if(underlayAnalysisBlock) underlayAnalysisBlock.style.display = has ? '' : 'none';
+  const analysisUnderlayPanel = document.getElementById('analysisUnderlayPanel');
+  if(analysisUnderlayPanel) analysisUnderlayPanel.style.display = has ? '' : 'none';
 
   ['histThUnderlay1','histThUnderlay2','histThUnderlay3','histThUnderlay4'].forEach(id=>{
     const th = document.getElementById(id);
@@ -2839,28 +2826,16 @@ function copySkuPricesForExport(){
   }
 }
 
-const CONV_CAT_LABELS = {labor:'Labor', elec:'Electricity', other:'Other Direct', oh:'Overhead'};
-
-function computeLineDayRow(cLine){
-  const outputKg = cLine.outputKg;
-  const categoryPerKg = {};
-  Object.keys(CONV_CAT_LABELS).forEach(cat=>{
-    categoryPerKg[cat] = outputKg>0 ? (cLine[cat]||0)/outputKg : 0;
-  });
-  return {
-    outputKg,
-    conversionPerKg: cLine.conversionPerKg,
-    categoryPerKg,
-    efficiencyPct: cLine.efficiencyPct,
-    ledgerWarning: (cLine.rawMaterials||[]).some(m=>m.ledgerWarning)
-  };
-}
-function findDrivingCategory(dayCatPerKg, periodCatPerKg, direction, labels){
-  // direction +1 looks for categories running ABOVE the period average (explains an expensive day's conversion cost);
-  // direction -1 looks for categories running BELOW it (explains a cheap day's conversion cost). Picks the single
+// Only these categories make up Conversion Cost (labor + electricity + other-direct + overhead) —
+// Raw Material and lamination Consumables are deliberately excluded, since this analysis is about
+// the cost of running the line itself, not what went into it.
+const CONVERSION_CAT_LABELS = {labor:'Labor', elec:'Electricity', other:'Other Direct', oh:'Overhead'};
+function findDrivingCategory(dayCatPerKg, periodCatPerKg, direction){
+  // direction +1 looks for categories running ABOVE the period average (explains an expensive day);
+  // direction -1 looks for categories running BELOW it (explains a cheap day). Picks the single
   // largest ₹/kg swing in that direction — the category doing the most to explain the day's result.
   let best = null, bestSignedDelta = 0;
-  Object.keys(labels).forEach(cat=>{
+  Object.keys(CONVERSION_CAT_LABELS).forEach(cat=>{
     const delta = (dayCatPerKg[cat]||0) - (periodCatPerKg[cat]||0);
     const signed = delta*direction;
     if(signed > bestSignedDelta){ bestSignedDelta = signed; best = cat; }
@@ -2868,40 +2843,53 @@ function findDrivingCategory(dayCatPerKg, periodCatPerKg, direction, labels){
   if(!best) return null;
   return { category: best, deltaPerKg: dayCatPerKg[best]-periodCatPerKg[best] };
 }
-function buildLineAnalysis(rows){
+function computeLineAnalysis(dates, lineResults){
+  // lineResults[i] is that line's own computeDay() sub-object (c.sheets or c.underlay) for dates[i]
+  const rows = dates.map((d,i)=>{
+    const line = lineResults[i];
+    const outputKg = line.outputKg;
+    const conversionPerKg = outputKg>0 ? line.conversionCost/outputKg : 0;
+    const categoryPerKg = {};
+    Object.keys(CONVERSION_CAT_LABELS).forEach(cat=>{ categoryPerKg[cat] = outputKg>0 ? (line[cat]||0)/outputKg : 0; });
+    return { date: d, outputKg, conversionPerKg, categoryPerKg, efficiencyPct: line.efficiencyPct };
+  });
+
   const totalOutputKg = rows.reduce((s,r)=>s+r.outputKg,0);
   const totalConvCost = rows.reduce((s,r)=>s+r.conversionPerKg*r.outputKg,0);
-  const periodAvgConvPerKg = totalOutputKg>0 ? totalConvCost/totalOutputKg : 0;
+  const periodAvgPerKg = totalOutputKg>0 ? totalConvCost/totalOutputKg : 0;
   const periodCatPerKg = {};
-  Object.keys(CONV_CAT_LABELS).forEach(cat=>{
+  Object.keys(CONVERSION_CAT_LABELS).forEach(cat=>{
     const sum = rows.reduce((s,r)=>s+r.categoryPerKg[cat]*r.outputKg,0);
     periodCatPerKg[cat] = totalOutputKg>0 ? sum/totalOutputKg : 0;
   });
+
   rows.forEach(r=>{
-    r.deviationPerKg = r.conversionPerKg - periodAvgConvPerKg;
-    r.deviationPct = periodAvgConvPerKg>0 ? (r.deviationPerKg/periodAvgConvPerKg)*100 : 0;
-    r.driving = findDrivingCategory(r.categoryPerKg, periodCatPerKg, r.deviationPerKg>=0 ? 1 : -1, CONV_CAT_LABELS);
+    r.deviationPerKg = r.conversionPerKg - periodAvgPerKg;
+    r.deviationPct = periodAvgPerKg>0 ? (r.deviationPerKg/periodAvgPerKg)*100 : 0;
+    r.driving = findDrivingCategory(r.categoryPerKg, periodCatPerKg, r.deviationPerKg>=0 ? 1 : -1);
   });
+
   const withOutput = rows.filter(r=>r.outputKg>0);
   const best = withOutput.length ? withOutput.reduce((a,b)=> b.conversionPerKg<a.conversionPerKg?b:a) : null;
   const worst = withOutput.length ? withOutput.reduce((a,b)=> b.conversionPerKg>a.conversionPerKg?b:a) : null;
   const avgEff = rows.length ? rows.reduce((s,r)=>s+r.efficiencyPct,0)/rows.length : 0;
-  const lowEffDays = rows.filter(r=>r.efficiencyPct < avgEff-5).map(r=>r.date); // more than 5pp below this period's own average
-  const warningDays = rows.filter(r=>r.ledgerWarning).map(r=>r.date);
-  return { rows, periodAvgConvPerKg, periodCatPerKg, best, worst, avgEff, lowEffDays, warningDays };
+  const lowEffDays = rows.filter(r=>r.efficiencyPct < avgEff-5).map(r=>r.date); // >5pp below this period's own average
+
+  return { rows, periodAvgPerKg, best, worst, avgEff, lowEffDays };
 }
 function computeWeeklyAnalysis(dates, ledger, from, to){
   const hasU = currentUnit().hasUnderlay;
-  const sheetRows = [], underlayRows = [];
+  const sheetResults = [], underlayResults = [];
   dates.forEach(d=>{
     const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{}, (ledger.ledgerByDate[d]||{}).reclaimRate);
-    sheetRows.push({date:d, ...computeLineDayRow(c.sheets)});
-    if(hasU) underlayRows.push({date:d, ...computeLineDayRow(c.underlay)});
+    sheetResults.push(c.sheets);
+    if(hasU) underlayResults.push(c.underlay);
   });
-  const sheets = buildLineAnalysis(sheetRows);
-  const underlay = hasU ? buildLineAnalysis(underlayRows) : null;
+  const sheets = computeLineAnalysis(dates, sheetResults);
+  const underlay = hasU ? computeLineAnalysis(dates, underlayResults) : null;
 
-  // missing calendar days within the selected range that have no logged entry at all
+  // missing calendar days within the selected range that have no logged entry at all — shared
+  // across both lines, since a day with no entry has no data for either line.
   const missing = [];
   let cursor = from;
   let safety = 0; // hard cap — guarantees this can never freeze the tab even in an unforeseen edge case
@@ -2913,29 +2901,27 @@ function computeWeeklyAnalysis(dates, ledger, from, to){
     safety++;
   }
 
-  return { sheets, underlay, missing, hasU };
+  return { sheets, underlay, hasU, missing };
 }
-function renderLineAnalysisSection(prefix, lineName, a){
-  const summaryEl = document.getElementById(prefix+'AnalysisSummary');
-  const bodyEl = document.getElementById(prefix+'AnalysisBody');
-  const notesEl = document.getElementById(prefix+'AnalysisNotes');
-  if(!summaryEl || !bodyEl || !notesEl) return;
+function renderLineAnalysis(lineData, summaryId, bodyId, notesId, lineLabel){
+  const summaryEl = document.getElementById(summaryId);
+  const bodyEl = document.getElementById(bodyId);
+  const notesEl = document.getElementById(notesId);
 
   const fmtDelta = (pct) => (pct>=0?'▲ +':'▼ ')+Math.abs(pct).toFixed(1)+'%';
   const deltaColor = (pct) => pct>=0 ? 'var(--bad)' : 'var(--good)';
 
-  const bestCard = a.best ? `<div class="preview-item"><span class="l">Best day (conversion)</span><span class="v" style="color:var(--good);">${a.best.date} &mdash; ${fmtMoney(a.best.conversionPerKg)}/kg</span></div>` : '';
-  const worstCard = a.worst ? `<div class="preview-item"><span class="l">Worst day (conversion)</span><span class="v" style="color:var(--bad);">${a.worst.date} &mdash; ${fmtMoney(a.worst.conversionPerKg)}/kg</span></div>` : '';
+  const bestCard = lineData.best ? `<div class="preview-item"><span class="l">Best day</span><span class="v" style="color:var(--good);">${lineData.best.date} &mdash; ${fmtMoney(lineData.best.conversionPerKg)}/kg</span></div>` : '';
+  const worstCard = lineData.worst ? `<div class="preview-item"><span class="l">Worst day</span><span class="v" style="color:var(--bad);">${lineData.worst.date} &mdash; ${fmtMoney(lineData.worst.conversionPerKg)}/kg</span></div>` : '';
   summaryEl.innerHTML = `<div class="preview-strip" style="margin-top:0;">
-    <div class="preview-item"><span class="l">${lineName} period avg conversion ₹/kg</span><span class="v">${fmtMoney(a.periodAvgConvPerKg)}/kg</span></div>
+    <div class="preview-item"><span class="l">Period weighted avg conversion ₹/kg</span><span class="v">${fmtMoney(lineData.periodAvgPerKg)}/kg</span></div>
     ${bestCard}${worstCard}
   </div>`;
 
-  bodyEl.innerHTML = a.rows.map(r=>{
-    const drivingText = r.driving ? CONV_CAT_LABELS[r.driving.category]+' ('+(r.driving.deltaPerKg>=0?'+':'')+fmtMoney(r.driving.deltaPerKg)+'/kg vs. avg)' : '—';
-    const warnBadge = r.ledgerWarning ? ' <span style="color:var(--bad);" title="Consumption exceeded recorded stock for a raw material this day">⚠</span>' : '';
+  bodyEl.innerHTML = lineData.rows.map(r=>{
+    const drivingText = r.driving ? CONVERSION_CAT_LABELS[r.driving.category]+' ('+(r.driving.deltaPerKg>=0?'+':'')+fmtMoney(r.driving.deltaPerKg)+'/kg vs. avg)' : '—';
     return `<tr>
-      <td>${r.date}${warnBadge}</td>
+      <td>${r.date}</td>
       <td style="font-family:var(--f-mono);">${fmtMoney(r.conversionPerKg)}</td>
       <td style="font-family:var(--f-mono);color:${deltaColor(r.deviationPct)};">${fmtDelta(r.deviationPct)}</td>
       <td style="font-family:var(--f-mono);">${r.efficiencyPct.toFixed(1)}%</td>
@@ -2944,27 +2930,24 @@ function renderLineAnalysisSection(prefix, lineName, a){
   }).join('') || `<tr><td colspan="5" class="batch-empty">No data.</td></tr>`;
 
   const notes = [];
-  if(a.worst && a.worst.driving){
-    notes.push(`<strong>${a.worst.date}</strong> had ${lineName}'s highest conversion cost (${fmtMoney(a.worst.conversionPerKg)}/kg, ${fmtDelta(a.worst.deviationPct)} vs. this period's average) — mainly driven by <strong>${CONV_CAT_LABELS[a.worst.driving.category]}</strong>, running ${fmtMoney(a.worst.driving.deltaPerKg)}/kg above average that day.`);
+  if(lineData.worst && lineData.worst.driving){
+    notes.push(`<strong>${lineData.worst.date}</strong> had ${lineLabel}'s highest conversion cost (${fmtMoney(lineData.worst.conversionPerKg)}/kg, ${fmtDelta(lineData.worst.deviationPct)} vs. this period's average) — mainly driven by <strong>${CONVERSION_CAT_LABELS[lineData.worst.driving.category]}</strong>, running ${fmtMoney(lineData.worst.driving.deltaPerKg)}/kg above average that day.`);
   }
-  if(a.best && a.best.driving){
-    notes.push(`<strong>${a.best.date}</strong> had ${lineName}'s lowest conversion cost (${fmtMoney(a.best.conversionPerKg)}/kg, ${fmtDelta(a.best.deviationPct)} vs. average) — helped most by lower <strong>${CONV_CAT_LABELS[a.best.driving.category]}</strong>, ${fmtMoney(Math.abs(a.best.driving.deltaPerKg))}/kg below average.`);
+  if(lineData.best && lineData.best.driving){
+    notes.push(`<strong>${lineData.best.date}</strong> had ${lineLabel}'s lowest conversion cost (${fmtMoney(lineData.best.conversionPerKg)}/kg, ${fmtDelta(lineData.best.deviationPct)} vs. average) — helped most by lower <strong>${CONVERSION_CAT_LABELS[lineData.best.driving.category]}</strong>, ${fmtMoney(Math.abs(lineData.best.driving.deltaPerKg))}/kg below average.`);
   }
-  if(a.lowEffDays.length){
-    notes.push(`${lineName} efficiency dropped notably (more than 5 points below this period's own average of ${a.avgEff.toFixed(1)}%) on: <strong>${a.lowEffDays.join(', ')}</strong>.`);
-  }
-  if(a.warningDays.length){
-    notes.push(`Raw material consumption exceeded recorded stock on: <strong>${a.warningDays.join(', ')}</strong> — check for a missing purchase entry on or before those dates.`);
+  if(lineData.lowEffDays.length){
+    notes.push(`${lineLabel} efficiency dropped notably (more than 5 points below this period's own average of ${lineData.avgEff.toFixed(1)}%) on: <strong>${lineData.lowEffDays.join(', ')}</strong>.`);
   }
   notesEl.innerHTML = notes.length ? `<ul style="margin:10px 0 0;padding-left:20px;font-family:var(--f-mono);font-size:12px;color:var(--muted);line-height:1.8;">${notes.map(n=>'<li>'+n+'</li>').join('')}</ul>` : '<p style="font-family:var(--f-mono);font-size:12px;color:var(--muted-dk);margin-top:10px;">Nothing unusual to flag for this period.</p>';
 }
 function renderWeeklyAnalysis(a){
-  renderLineAnalysisSection('sheets', 'Sheets', a.sheets);
-  if(a.hasU && a.underlay){ renderLineAnalysisSection('underlay', 'Underlay', a.underlay); }
+  renderLineAnalysis(a.sheets, 'analysisSummarySheets', 'analysisBodySheets', 'analysisNotesSheets', 'Sheets');
+  if(a.hasU) renderLineAnalysis(a.underlay, 'analysisSummaryUnderlay', 'analysisBodyUnderlay', 'analysisNotesUnderlay', 'Underlay');
   const missingNote = document.getElementById('analysisMissingNote');
-  if(missingNote){
-    missingNote.innerHTML = a.missing.length ? `<div class="note-box">No entry logged for: <strong>${a.missing.join(', ')}</strong> — excluded from every figure above.</div>` : '';
-  }
+  missingNote.innerHTML = a.missing.length
+    ? `No entry logged for: <strong>${a.missing.join(', ')}</strong> — excluded from every figure above.`
+    : `Every day in this period has a logged entry.`;
 }
 
 function renderReports(){
