@@ -749,6 +749,7 @@
       <div class="btn-row" style="margin-top:10px;">
         <button class="btn btn-sm" onclick="addMasterSku()">+ Add SKU</button>
         <button class="btn btn-primary" onclick="saveMasterSkus()">Save SKU master</button>
+        <button class="btn btn-sm" onclick="exportMasterSkusToExcel()">Export to Excel</button>
       </div>
       <div class="note-box">Front/back backing text is matched by keyword: "NONWOVEN" (+ "PRINT" for printed rate), "COREFRESH" (priced as Wilkies paper, + "WHITE" for the white variant — checked before the generic paper match, so any name containing both still gets the Wilkies rate), "PAPER" (+ "WHITE" for white rate), "PE FILM", or "FOIL". Outer bag is matched by "PRINTED" vs everything else (clear/color bag rate). Weight/roll = Length × Width × Thickness(m) × Density.</div>
       <div class="status-msg" id="masterSkuStatus"></div>
@@ -3137,6 +3138,33 @@ async function saveMasterSkus(){
   el.textContent = ok ? 'SKU master saved.' : 'Kept for this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + '). Use Export data to back it up.';
   el.className = ok ? 'status-msg' : 'status-msg err';
   showStorageWarningIfNeeded();
+}
+function exportMasterSkusToExcel(){
+  const el = document.getElementById('masterSkuStatus');
+  if(typeof XLSX === 'undefined'){
+    el.textContent = 'Excel export tool did not load — check your internet connection and refresh the page.';
+    el.className = 'status-msg err';
+    return;
+  }
+  const rows = MASTER_SKUS.map(s=>({
+    'Name': s.name,
+    'Front backing': s.front,
+    'Back backing': s.back,
+    'Outer bag': s.bag,
+    'Length (m)': Number(s.lengthM)||0,
+    'Width (m)': Number(s.widthM)||0,
+    'Thickness (mm)': Number(s.thicknessMM)||0,
+    'Density': Number(s.density)||0,
+    'Wt/roll (kg)': Number(skuWeightPerRoll(s).toFixed(3))
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:20},{wch:26},{wch:26},{wch:20},{wch:10},{wch:10},{wch:12},{wch:9},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Roll SKU Master');
+  const filename = 'roll-sku-master-'+currentUnit().name.replace(/\s+/g,'-')+'-'+todayStr()+'.xlsx';
+  XLSX.writeFile(wb, filename);
+  el.textContent = 'Downloaded '+filename+' ('+rows.length+' SKUs, current for '+currentUnit().name+').';
+  el.className = 'status-msg';
 }
 
 function renderRawMaterialMasterTable(){
