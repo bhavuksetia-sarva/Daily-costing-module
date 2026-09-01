@@ -768,6 +768,7 @@
       <p style="font-family:var(--f-mono);font-size:12px;color:var(--muted);">Everyone who opens this page reads and writes the same shared database, so data is live across the team automatically. Export/import gives you a manual backup independent of that.</p>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+        <button class="btn" onclick="recomputeAndResaveAllEntries()">Recompute &amp; re-save all entries (this unit)</button>
         <button class="btn" onclick="exportAllData()">Export data (.json)</button>
         <button class="btn" onclick="document.getElementById('importFileInput').click()">Import data (.json)</button>
         <input type="file" id="importFileInput" accept="application/json" style="display:none;" onchange="importAllData(this.files[0])">
@@ -2557,8 +2558,27 @@ document.getElementById('entryDate').addEventListener('change', ()=>{
 });
 
 async function saveEntry(){
-  const e = readEntryForm();
-  if(!e.date){ document.getElementById('entryStatus').textContent = 'Pick a date first.'; document.getElementById('entryStatus').className='status-msg err'; return; }
+  const dateVal = document.getElementById('entryDate').value;
+  if(!dateVal){ document.getElementById('entryStatus').textContent = 'Pick a date first.'; document.getElementById('entryStatus').className='status-msg err'; return; }
+
+  // Compute final costs the same way the live preview does, and persist them
+  // onto each batch — so anything reading this entry later (e.g. the Order
+  // Management sync job) gets real totalCost/costPerRoll from storage,
+  // instead of only the raw inputs this form collects.
+  const { entry: e, materialRates, reclaimRate } = currentEditingLedgerRates();
+  const c = computeDay(e, SETTINGS, materialRates, reclaimRate);
+  e.sh_batches = c.sheets.batches.map(b=>({
+    id:b.id, spec:b.spec||'', outputKg:Number(b.outputKg)||0,
+    materialsCost:b.materialsCost, processCost:b.processCost, totalCost:b.totalCost, costPerKg:b.costPerKg
+  }));
+  e.u_batches = c.underlay.batches.map(b=>({
+    id:b.id, skuId:b.skuId||'', skuName:b.skuName,
+    weightPerRoll:b.weightPerRoll, frontCostPerRoll:b.frontCostPerRoll, backCostPerRoll:b.backCostPerRoll,
+    bagCostPerRoll:b.bagCostPerRoll, rollCount:b.rollCount, outputKgOverride:b.outputKgOverride,
+    outputKg:b.outputKg, glueKg:b.glueKg, materialsCost:b.materialsCost, processCost:b.processCost,
+    totalCost:b.totalCost, costPerKg:b.costPerKg, costPerRoll:b.costPerRoll
+  }));
+
   const ok = await storageSet(dailyKey(e.date), e);
   const statusEl = document.getElementById('entryStatus');
   ENTRIES[e.date] = e; // keep it in memory for this session even if the central save failed
@@ -3200,6 +3220,39 @@ async function saveRawMaterialMaster(){
   el.className = ok ? 'status-msg' : 'status-msg err';
   showStorageWarningIfNeeded();
   refreshRawMaterialDisplays();
+}
+
+async function recomputeAndResaveAllEntries(){
+  const statusEl = document.getElementById('settingsStatus');
+  const dates = Object.keys(ENTRIES).sort();
+  if(dates.length===0){ statusEl.textContent = 'No entries to recompute for '+currentUnit().name+'.'; statusEl.className='status-msg'; return; }
+  statusEl.textContent = 'Recomputing '+dates.length+' entries for '+currentUnit().name+'...';
+  statusEl.className = 'status-msg';
+  const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
+  let failed = 0;
+  for(const date of dates){
+    const entry = ENTRIES[date];
+    const rates = (ledger.ledgerByDate[date]||{}).perMaterial || {};
+    const reclaimRate = (ledger.ledgerByDate[date]||{}).reclaimRate;
+    const c = computeDay(entry, SETTINGS, rates, reclaimRate);
+    entry.sh_batches = c.sheets.batches.map(b=>({
+      id:b.id, spec:b.spec||'', outputKg:Number(b.outputKg)||0,
+      materialsCost:b.materialsCost, processCost:b.processCost, totalCost:b.totalCost, costPerKg:b.costPerKg
+    }));
+    entry.u_batches = c.underlay.batches.map(b=>({
+      id:b.id, skuId:b.skuId||'', skuName:b.skuName,
+      weightPerRoll:b.weightPerRoll, frontCostPerRoll:b.frontCostPerRoll, backCostPerRoll:b.backCostPerRoll,
+      bagCostPerRoll:b.bagCostPerRoll, rollCount:b.rollCount, outputKgOverride:b.outputKgOverride,
+      outputKg:b.outputKg, glueKg:b.glueKg, materialsCost:b.materialsCost, processCost:b.processCost,
+      totalCost:b.totalCost, costPerKg:b.costPerKg, costPerRoll:b.costPerRoll
+    }));
+    const ok = await storageSet(dailyKey(date), entry);
+    if(!ok) failed++;
+  }
+  statusEl.textContent = failed===0
+    ? 'Recomputed and re-saved '+dates.length+' entries for '+currentUnit().name+'. Repeat for other units via the unit switcher above.'
+    : 'Recomputed '+dates.length+' entries for '+currentUnit().name+', but '+failed+' failed to save centrally — check your connection and try again.';
+  statusEl.className = failed===0 ? 'status-msg' : 'status-msg err';
 }
 
 async function resetAllData(){
