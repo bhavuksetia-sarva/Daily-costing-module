@@ -1800,6 +1800,22 @@ function excelDateToISO(val){
   return '';
 }
 
+// Finds an optional column's key in `idx` (normalized-header -> column index).
+// Tries each exact candidate header first (in order) — since these are the real
+// headers seen on actual production sheets, an exact hit is unambiguous and can
+// never cross-match a different column. Only if none of the exact candidates are
+// present does it fall back to the looser keyword regex, as a safety net for
+// units whose sheet uses slightly different wording. This ordering is what
+// guarantees "LD Foam" and "Quilt Foam" (or "Filter Foam") can never resolve to
+// the same column, however loosely the fallback regexes might overlap.
+function findOptionalCol(idx, exactCandidates, fallbackRegex){
+  for(const name of exactCandidates){
+    const key = normKey(name);
+    if(key in idx) return key;
+  }
+  return Object.keys(idx).find(k=>fallbackRegex.test(k));
+}
+
 function aggregateSheetExcelRows(wsData){
   if(!wsData || wsData.length<2) throw new Error('No data rows found.');
   const headerRow = wsData[0].map(normKey);
@@ -1809,12 +1825,13 @@ function aggregateSheetExcelRows(wsData){
   const missing = need.filter(k=>!(normKey(k) in idx));
   if(missing.length) throw new Error('Missing expected column(s): '+missing.join(', ')+'. Check this is the "Sheet Production Data" tab with unchanged headers.');
 
-  // Optional columns — Memory Foam, LD Foam and Quilt are not present in every unit's sheet
-  // yet, so they're detected by keyword rather than required, and simply contribute 0 kg
+  // Optional columns — Memory, LD Foam, Quilt Foam and Filter Foam are not present on every
+  // unit's sheet yet, so they're detected rather than required, and simply contribute 0 kg
   // (and are skipped in matching, see applyCombinedExcelImport) if the column is absent.
-  const memoryCol = Object.keys(idx).find(k=>/memory/i.test(k));
-  const ldFoamCol = Object.keys(idx).find(k=>/\bld\b/i.test(k));
-  const quiltCol = Object.keys(idx).find(k=>/quilt/i.test(k));
+  const memoryCol = findOptionalCol(idx, ['Memory','Memory Foam','Memory Foam Scrap'], /memory/i);
+  const ldFoamCol = findOptionalCol(idx, ['LD Foam','LD Foam Scrap'], /\bld\b/i);
+  const quiltCol = findOptionalCol(idx, ['Quilt Foam','Quilt','Quilt Scrap'], /quilt/i);
+  const filterCol = findOptionalCol(idx, ['Filter Foam','Filter Foam Scrap','Filter'], /filter/i);
 
   const num = (row,key) => { const v = row[idx[normKey(key)]]; const n = parseFloat(v); return isFinite(n) ? n : 0; };
   const numAt = (row,colKey) => { if(!colKey) return 0; const v = row[idx[colKey]]; const n = parseFloat(v); return isFinite(n) ? n : 0; };
@@ -1826,7 +1843,7 @@ function aggregateSheetExcelRows(wsData){
     if(rawDate===undefined || rawDate==='') continue;
     const dateStr = excelDateToISO(rawDate);
     if(!dateStr) continue;
-    if(!byDate[dateStr]) byDate[dateStr] = {date:dateStr, localKg:0, importedKg:0, rebondedKg:0, binderKg:0, memoryKg:0, ldFoamKg:0, quiltKg:0, blockTotalKg:0, outputKg:0, scrapKg:0, rows:0};
+    if(!byDate[dateStr]) byDate[dateStr] = {date:dateStr, localKg:0, importedKg:0, rebondedKg:0, binderKg:0, memoryKg:0, ldFoamKg:0, quiltKg:0, filterKg:0, blockTotalKg:0, outputKg:0, scrapKg:0, rows:0};
     const agg = byDate[dateStr];
     agg.localKg += num(row,'Local');
     agg.importedKg += num(row,'Imported Scrap');
@@ -1835,6 +1852,7 @@ function aggregateSheetExcelRows(wsData){
     agg.memoryKg += numAt(row, memoryCol);
     agg.ldFoamKg += numAt(row, ldFoamCol);
     agg.quiltKg += numAt(row, quiltCol);
+    agg.filterKg += numAt(row, filterCol);
     agg.blockTotalKg += num(row,'Block Total');
     agg.outputKg += num(row,'Total output wt');
     agg.scrapKg += num(row,'Wt. of Scrap (kg)');
@@ -1852,12 +1870,13 @@ function aggregateUnderlayExcelRows(wsData){
   const missing = need.filter(k=>!(normKey(k) in idx));
   if(missing.length) throw new Error('Missing expected column(s): '+missing.join(', ')+'. Check this is the "Round Block data" tab with unchanged headers.');
 
-  // Optional columns — Memory Foam, LD Foam and Quilt are not present in every unit's sheet
-  // yet, so they're detected by keyword rather than required, and simply contribute 0 kg
-  // (and are skipped in matching, see applyCombinedExcelImport) if the column is absent.
-  const memoryCol = Object.keys(idx).find(k=>/memory/i.test(k));
-  const ldFoamCol = Object.keys(idx).find(k=>/\bld\b/i.test(k));
-  const quiltCol = Object.keys(idx).find(k=>/quilt/i.test(k));
+  // Optional columns — Memory Foam, LD Foam, Quilt Foam and Filter Foam are not present in
+  // every unit's sheet yet, so they're detected rather than required, and simply contribute
+  // 0 kg (and are skipped in matching, see applyCombinedExcelImport) if the column is absent.
+  const memoryCol = findOptionalCol(idx, ['Memory Foam Scrap','Memory','Memory Foam'], /memory/i);
+  const ldFoamCol = findOptionalCol(idx, ['LD Foam Scrap','LD Foam'], /\bld\b/i);
+  const quiltCol = findOptionalCol(idx, ['Quilt Scrap','Quilt Foam','Quilt'], /quilt/i);
+  const filterCol = findOptionalCol(idx, ['Filter Foam Scrap','Filter Foam','Filter'], /filter/i);
 
   const num = (row,key) => { const v = row[idx[normKey(key)]]; const n = parseFloat(v); return isFinite(n) ? n : 0; };
   const numAt = (row,colKey) => { if(!colKey) return 0; const v = row[idx[colKey]]; const n = parseFloat(v); return isFinite(n) ? n : 0; };
@@ -1869,14 +1888,14 @@ function aggregateUnderlayExcelRows(wsData){
     if(rawDate===undefined || rawDate==='') continue;
     const dateStr = excelDateToISO(rawDate);
     if(!dateStr) continue;
-    if(!byDate[dateStr]) byDate[dateStr] = {date:dateStr, localKg:0, importedKg:0, rebondedKg:0, memoryKg:0, ldFoamKg:0, quiltKg:0, binderKg:0, blockTotalKg:0, wastageKg:0, rows:0, skuRolls:{}};
+    if(!byDate[dateStr]) byDate[dateStr] = {date:dateStr, localKg:0, importedKg:0, rebondedKg:0, memoryKg:0, ldFoamKg:0, quiltKg:0, filterKg:0, binderKg:0, blockTotalKg:0, wastageKg:0, rows:0, skuRolls:{}};
     const agg = byDate[dateStr];
     const imported = num(row,'Imported Foam Scrap'), local = num(row,'Local Foam Scrap'), rebonded = num(row,'Rebonded Foam Scrap'),
           binder = num(row,'Hard Binder 1519')+num(row,'Soft Binder 1513')+num(row,'Soft Binder 1026');
-    const memory = numAt(row, memoryCol), ldFoam = numAt(row, ldFoamCol), quilt = numAt(row, quiltCol);
+    const memory = numAt(row, memoryCol), ldFoam = numAt(row, ldFoamCol), quilt = numAt(row, quiltCol), filter = numAt(row, filterCol);
     agg.importedKg += imported; agg.localKg += local; agg.rebondedKg += rebonded; agg.memoryKg += memory; agg.binderKg += binder;
-    agg.ldFoamKg += ldFoam; agg.quiltKg += quilt;
-    agg.blockTotalKg += imported+local+rebonded+memory+binder+ldFoam+quilt;
+    agg.ldFoamKg += ldFoam; agg.quiltKg += quilt; agg.filterKg += filter;
+    agg.blockTotalKg += imported+local+rebonded+memory+binder+ldFoam+quilt+filter;
     agg.wastageKg += num(row,'Total wastage (edge trimming)') + num(row,'Wastage (Peeling)');
     agg.rows += 1;
     const skuName = normHeader(row[idx[normKey('Product SKU')]]);
@@ -1950,7 +1969,8 @@ function renderCombinedExcelPreview(dates, selectedDate){
       <div class="preview-item"><span class="l">Binder / Adhesive</span><span class="v">${fmtKg(s.binderKg)}</span></div>
       ${s.memoryKg>0 ? `<div class="preview-item"><span class="l">Memory Foam</span><span class="v">${fmtKg(s.memoryKg)}</span></div>` : ''}
       ${s.ldFoamKg>0 ? `<div class="preview-item"><span class="l">LD Foam</span><span class="v">${fmtKg(s.ldFoamKg)}</span></div>` : ''}
-      ${s.quiltKg>0 ? `<div class="preview-item"><span class="l">Quilt</span><span class="v">${fmtKg(s.quiltKg)}</span></div>` : ''}
+      ${s.quiltKg>0 ? `<div class="preview-item"><span class="l">Quilt Foam</span><span class="v">${fmtKg(s.quiltKg)}</span></div>` : ''}
+      ${s.filterKg>0 ? `<div class="preview-item"><span class="l">Filter Foam</span><span class="v">${fmtKg(s.filterKg)}</span></div>` : ''}
       <div class="preview-item"><span class="l">Block total</span><span class="v amber">${fmtKg(s.blockTotalKg)}</span></div>
       <div class="preview-item"><span class="l">Total output</span><span class="v">${fmtKg(s.outputKg)}</span></div>
       <div class="preview-item"><span class="l">Trim wastage</span><span class="v">${fmtKg(s.scrapKg)}</span></div>
@@ -1975,7 +1995,8 @@ function renderCombinedExcelPreview(dates, selectedDate){
       <div class="preview-item"><span class="l">Binder / Adhesive</span><span class="v">${fmtKg(u.binderKg)}</span></div>
       ${u.memoryKg>0 ? `<div class="preview-item"><span class="l">Memory Foam</span><span class="v">${fmtKg(u.memoryKg)}</span></div>` : ''}
       ${u.ldFoamKg>0 ? `<div class="preview-item"><span class="l">LD Foam</span><span class="v">${fmtKg(u.ldFoamKg)}</span></div>` : ''}
-      ${u.quiltKg>0 ? `<div class="preview-item"><span class="l">Quilt</span><span class="v">${fmtKg(u.quiltKg)}</span></div>` : ''}
+      ${u.quiltKg>0 ? `<div class="preview-item"><span class="l">Quilt Foam</span><span class="v">${fmtKg(u.quiltKg)}</span></div>` : ''}
+      ${u.filterKg>0 ? `<div class="preview-item"><span class="l">Filter Foam</span><span class="v">${fmtKg(u.filterKg)}</span></div>` : ''}
       <div class="preview-item"><span class="l">Block total</span><span class="v steel">${fmtKg(u.blockTotalKg)}</span></div>
       <div class="preview-item"><span class="l">Total wastage</span><span class="v">${fmtKg(u.wastageKg)} <span style="color:var(--muted-dk);">(edge trim + peeling)</span></span></div>
     </div>`;
@@ -2039,6 +2060,7 @@ function applyCombinedExcelImport(dateStr){
     if(s.memoryKg>0) sResults.push(['Memory Foam', setSheetMaterialQty(/memory/i, s.memoryKg)]);
     if(s.ldFoamKg>0) sResults.push(['LD Foam', setSheetMaterialQty(/\bld\b/i, s.ldFoamKg)]);
     if(s.quiltKg>0) sResults.push(['Quilt', setSheetMaterialQty(/quilt/i, s.quiltKg)]);
+    if(s.filterKg>0) sResults.push(['Filter Foam', setSheetMaterialQty(/filter/i, s.filterKg)]);
     document.getElementById('s_sheetBlocksKg').value = Number(s.blockTotalKg.toFixed(2));
     document.getElementById('sh_wastageKg').value = Number(s.scrapKg.toFixed(2));
     let outRow = CURRENT_SHEET_BATCHES.find(b=>b.spec && b.spec.indexOf('[Excel Import]')===0);
@@ -2072,6 +2094,7 @@ function applyCombinedExcelImport(dateStr){
     if(u.memoryKg>0) uResults.push(['Memory Foam', setUnderlayMaterialQty(/memory/i, u.memoryKg)]);
     if(u.ldFoamKg>0) uResults.push(['LD Foam', setUnderlayMaterialQty(/\bld\b/i, u.ldFoamKg)]);
     if(u.quiltKg>0) uResults.push(['Quilt', setUnderlayMaterialQty(/quilt/i, u.quiltKg)]);
+    if(u.filterKg>0) uResults.push(['Filter Foam', setUnderlayMaterialQty(/filter/i, u.filterKg)]);
     document.getElementById('s_underlayBlocksKg').value = Number(u.blockTotalKg.toFixed(2));
     document.getElementById('u_wastageKg').value = Number(u.wastageKg.toFixed(2));
 
