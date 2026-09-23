@@ -57,6 +57,8 @@
   .kpi.k-amber::before{background:var(--amber);}
   .kpi.k-steel::before{background:var(--steel);}
   .kpi.k-neutral::before{background:var(--muted-dk);}
+  .kpi.k-good::before{background:var(--good);}
+  .kpi.k-bad::before{background:var(--bad);}
   .kpi-label{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;}
   .kpi-val{font-family:var(--f-mono);font-size:28px;font-weight:600;color:var(--text);line-height:1;}
   .kpi-val small{font-size:13px;color:var(--muted);font-weight:400;margin-left:3px;}
@@ -193,6 +195,7 @@
       <button data-tab="entry">Daily Log</button>
       <button data-tab="history">History</button>
       <button data-tab="reports">Reports</button>
+      <button data-tab="profitability">Profitability</button>
       <button data-tab="inventory">Inventory</button>
       <button data-tab="settings">Settings</button>
     </nav>
@@ -642,6 +645,114 @@
       </div>
       <div class="note-box" id="analysisMissingNote"></div>
       <div class="note-box">Each line is analyzed independently — no blended figure. "Conversion ₹/kg" is labor + electricity + overhead (+ other direct costs), excluding raw material and, for Underlay, lamination consumables — the cost of running the line itself, not what went into it. "Driving factor" is whichever of those categories deviated furthest from that line's own period average, in the same direction as that day's overall conversion cost — i.e. what mainly pushed an expensive day up, or a cheap day down. All comparisons are against each line's own weighted average for this period, not a fixed target.</div>
+    </div>
+  </section>
+
+  <!-- ============ PROFITABILITY ============ -->
+  <section class="view" id="view-profitability">
+    <div class="panel">
+      <h2>Period <span class="accent">&mdash; opening/closing stock &amp; sales apply to this range</span></h2>
+      <div class="date-picker-row" style="margin-bottom:0;flex-wrap:wrap;">
+        <label for="profitPreset">Period</label>
+        <select id="profitPreset" onchange="applyProfitPreset()">
+          <option value="this_month">This month</option>
+          <option value="last_month">Last month</option>
+          <option value="custom">Custom range</option>
+        </select>
+        <label for="profitFrom" style="margin-left:8px;">From</label>
+        <input type="date" id="profitFrom" onchange="document.getElementById('profitPreset').value='custom'; loadProfitPeriodIntoForm();">
+        <label for="profitTo">To</label>
+        <input type="date" id="profitTo" onchange="document.getElementById('profitPreset').value='custom'; loadProfitPeriodIntoForm();">
+      </div>
+      <div class="note-box">Sheets vertical only. Blocks and sheets are treated as one pool of finished-goods kg at the same cost/kg. Production kg and cost/kg for this range are pulled automatically from the Daily Log (same weighted-average logic as the Reports tab) — everything else on this tab is stock and sales you enter.</div>
+    </div>
+
+    <div id="profitEmptyProd" class="note-box" style="display:none;border-color:var(--bad);"></div>
+
+    <div class="panel">
+      <h2>Opening &amp; closing stock <span class="accent">&mdash; blocks + sheets combined, kg</span></h2>
+      <div class="field-grid">
+        <div class="field">
+          <label>Opening stock <span class="unit">(kg)</span></label>
+          <input type="number" id="pf_openingKg" min="0" step="any" oninput="renderProfitability()">
+        </div>
+        <div class="field">
+          <label>Opening stock rate <span class="unit">(₹/kg, from last period's closing rate)</span></label>
+          <input type="number" id="pf_openingRate" min="0" step="any" oninput="renderProfitability()">
+        </div>
+        <div class="field">
+          <label>Closing stock <span class="unit">(kg)</span></label>
+          <input type="number" id="pf_closingKg" min="0" step="any" oninput="renderProfitability()">
+        </div>
+      </div>
+      <div class="note-box" id="pf_openingSuggestNote"></div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi k-amber">
+        <p class="kpi-label">Production this period</p>
+        <div class="kpi-val" id="pfProdKg">&mdash;</div>
+        <p class="kpi-sub" id="pfProdCost">&mdash;</p>
+      </div>
+      <div class="kpi k-neutral">
+        <p class="kpi-label">Blended cost / kg</p>
+        <div class="kpi-val" id="pfBlendedCost">&mdash;</div>
+        <p class="kpi-sub">Opening stock + production, weighted</p>
+      </div>
+      <div class="kpi k-neutral">
+        <p class="kpi-label">Dispatched (derived)</p>
+        <div class="kpi-val" id="pfDispatchedKg">&mdash;</div>
+        <p class="kpi-sub">Opening + production &minus; closing</p>
+      </div>
+      <div class="kpi k-neutral">
+        <p class="kpi-label">COGS</p>
+        <div class="kpi-val" id="pfCogs">&mdash;</div>
+        <p class="kpi-sub">Dispatched kg &times; blended cost/kg</p>
+      </div>
+    </div>
+    <div class="kpi-row kpi-row-2col">
+      <div class="kpi k-good" id="pfProfitCard">
+        <p class="kpi-label">Gross profit</p>
+        <div class="kpi-val" id="pfGrossProfit">&mdash;</div>
+        <p class="kpi-sub" id="pfMargin">&mdash;</p>
+      </div>
+      <div class="kpi k-steel">
+        <p class="kpi-label">Revenue</p>
+        <div class="kpi-val" id="pfRevenue">&mdash;</div>
+        <p class="kpi-sub" id="pfRevenueSub">&mdash;</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Sales by customer <span class="accent">&mdash; fixed ₹/kg rate for the period</span></h2>
+      <div class="batch-tbl-wrap">
+        <table class="batch-tbl">
+          <thead><tr><th>Customer</th><th>Rate ₹/kg</th><th>Dispatched kg</th><th>Revenue</th><th></th></tr></thead>
+          <tbody id="pf_customerBody"></tbody>
+        </table>
+      </div>
+      <div class="btn-row" style="margin-top:10px;"><button class="btn btn-sm" onclick="addProfitCustomer()">+ Add customer</button></div>
+      <div class="note-box" id="pf_reconcileNote"></div>
+    </div>
+
+    <div class="panel">
+      <div class="btn-row" style="margin-top:0;">
+        <button class="btn btn-primary" onclick="saveProfitPeriod()">Save this period</button>
+        <button class="btn btn-danger" id="pfDeleteBtn" onclick="deleteProfitPeriod()" style="display:none;">Delete this period</button>
+      </div>
+      <div class="status-msg" id="pfStatus"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Saved periods <span class="accent">&mdash; this unit</span></h2>
+      <div class="tbl-wrap">
+        <table id="profitHistoryTable">
+          <thead><tr><th>Period</th><th>Production kg</th><th>Dispatched kg</th><th>COGS</th><th>Revenue</th><th>Gross profit</th><th>Margin %</th><th></th></tr></thead>
+          <tbody id="profitHistoryBody"></tbody>
+        </table>
+      </div>
+      <div id="profitHistoryEmpty" class="empty-state" style="display:none;">No periods saved yet.</div>
+      <div class="note-box">Opening a saved period loads it back into the form above for editing. A new period's opening stock rate is suggested from the most recent earlier saved period's blended cost/kg — review and override it if the periods aren't contiguous.</div>
     </div>
   </section>
 
@@ -1249,7 +1360,7 @@ function showStorageWarningIfNeeded(){
 
 /* ---------------- manual JSON backup (works with or without storage) ---------------- */
 function exportAllData(){
-  const payload = { exportedAt: new Date().toISOString(), settings: SETTINGS, pricing: PRICING, masterSkus: MASTER_SKUS, rawMaterialMaster: RAW_MATERIAL_MASTER, entries: ENTRIES };
+  const payload = { exportedAt: new Date().toISOString(), settings: SETTINGS, pricing: PRICING, masterSkus: MASTER_SKUS, rawMaterialMaster: RAW_MATERIAL_MASTER, entries: ENTRIES, profitPeriods: PROFIT_PERIODS };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1271,6 +1382,7 @@ async function importAllData(file){
     if(payload.masterSkus && Array.isArray(payload.masterSkus)) MASTER_SKUS = payload.masterSkus;
     if(payload.rawMaterialMaster && Array.isArray(payload.rawMaterialMaster)) RAW_MATERIAL_MASTER = payload.rawMaterialMaster;
     if(payload.entries) ENTRIES = payload.entries;
+    if(payload.profitPeriods && Array.isArray(payload.profitPeriods)) PROFIT_PERIODS = payload.profitPeriods;
 
     // try to push into storage too, in case it's available now
     if(STORAGE_OK){
@@ -1278,11 +1390,12 @@ async function importAllData(file){
       await storageSet(unitScopedKey('roll_pricing'), PRICING);
       await storageSet(unitScopedKey('roll_master_skus'), MASTER_SKUS);
       await storageSet(unitScopedKey('raw_material_master'), RAW_MATERIAL_MASTER);
+      await storageSet(unitScopedKey('profit_periods'), PROFIT_PERIODS);
       await Promise.all(Object.values(ENTRIES).map(e => storageSet(dailyKey(e.date), e)));
     }
 
     fillSettingsForm(); fillPricingForm(); renderMasterSkuTable(); renderRawMaterialMasterTable();
-    populateDashDateSelect(); renderDashboard(); renderHistory();
+    populateDashDateSelect(); renderDashboard(); renderHistory(); renderProfitHistory();
     el.textContent = 'Backup loaded (' + Object.keys(ENTRIES).length + ' daily logs).' + (STORAGE_OK ? '' : ' Storage is unavailable here, so re-export before you close this window.');
     el.className = 'status-msg';
   }catch(e){
@@ -1327,6 +1440,15 @@ async function loadAllEntries(){
     }
   });
 }
+
+/* ---------------- profitability periods (Sheets vertical, per unit) ---------------- */
+let PROFIT_PERIODS = []; // {id, from, to, openingKg, openingRate, closingKg, customers:[{id,name,rate,kg}]}
+async function loadProfitPeriods(){
+  const raw = await storageGet(unitScopedKey('profit_periods'));
+  if(raw){ try{ const parsed = JSON.parse(raw); if(Array.isArray(parsed)) PROFIT_PERIODS = parsed; }catch(e){ PROFIT_PERIODS = []; } }
+  else PROFIT_PERIODS = [];
+}
+function profitPeriodId(from, to){ return from+'_'+to; }
 
 /* ---------------- computation ---------------- */
 /* ---------------- weighted-average raw material inventory ledger ---------------- */
@@ -1562,6 +1684,7 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
     document.getElementById('view-'+btn.dataset.tab).classList.add('active');
     if(btn.dataset.tab==='history') renderHistory();
     if(btn.dataset.tab==='reports') renderReports();
+    if(btn.dataset.tab==='profitability') renderProfitabilityTab();
     if(btn.dataset.tab==='inventory') renderInventory();
     if(btn.dataset.tab==='dashboard') renderDashboard();
   });
@@ -3146,6 +3269,229 @@ async function deleteFromHistory(d){
   renderDashboard();
 }
 
+/* ---------------- profitability (Sheets vertical: blocks + sheets, one pool) ---------------- */
+function aggregateSheetsCostForRange(from, to){
+  const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
+  const dates = Object.keys(ENTRIES).filter(d=>d>=from && d<=to).sort();
+  let outputKg = 0, totalCost = 0;
+  dates.forEach(d=>{
+    const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{}, (ledger.ledgerByDate[d]||{}).reclaimRate);
+    outputKg += c.sheets.outputKg;
+    totalCost += c.sheets.total;
+  });
+  return { outputKg, totalCost, avgCostPerKg: outputKg>0 ? totalCost/outputKg : 0, loggedDays: dates.length };
+}
+function findLatestPriorProfitPeriod(beforeDate){
+  const prior = PROFIT_PERIODS.filter(p=>p.to < beforeDate).sort((a,b)=> a.to<b.to?1:-1);
+  return prior.length ? prior[0] : null;
+}
+function computeProfitPeriod(period){
+  const prod = aggregateSheetsCostForRange(period.from, period.to);
+  const openingKg = Number(period.openingKg)||0;
+  const openingRate = Number(period.openingRate)||0;
+  const closingKg = Number(period.closingKg)||0;
+  const openingValue = openingKg * openingRate;
+  const totalAvailableKg = openingKg + prod.outputKg;
+  const totalAvailableValue = openingValue + prod.totalCost;
+  const blendedCostPerKg = totalAvailableKg>0 ? totalAvailableValue/totalAvailableKg : 0;
+  const closingValue = closingKg * blendedCostPerKg;
+  const dispatchedKg = totalAvailableKg - closingKg;
+  const cogs = totalAvailableValue - closingValue;
+  const customers = (period.customers||[]).map(c=>({...c, revenue: (Number(c.rate)||0)*(Number(c.kg)||0)}));
+  const revenue = customers.reduce((s,c)=>s+c.revenue,0);
+  const customerKgTotal = customers.reduce((s,c)=>s+(Number(c.kg)||0),0);
+  const grossProfit = revenue - cogs;
+  const grossMarginPct = revenue>0 ? (grossProfit/revenue)*100 : 0;
+  return { prod, openingKg, openingRate, openingValue, closingKg, closingValue, totalAvailableKg, totalAvailableValue,
+    blendedCostPerKg, dispatchedKg, cogs, customers, revenue, customerKgTotal, grossProfit, grossMarginPct };
+}
+
+let CURRENT_PROFIT_CUSTOMERS = [];
+function addProfitCustomer(){ CURRENT_PROFIT_CUSTOMERS.push({id:newBatchId(), name:'', rate:0, kg:0}); renderProfitability(); }
+function removeProfitCustomer(id){ CURRENT_PROFIT_CUSTOMERS = CURRENT_PROFIT_CUSTOMERS.filter(c=>c.id!==id); renderProfitability(); }
+function updateProfitCustomer(id, field, value){
+  const c = CURRENT_PROFIT_CUSTOMERS.find(x=>x.id===id);
+  if(!c) return;
+  c[field] = field==='name' ? value : (parseFloat(value)||0);
+  renderProfitability();
+}
+
+function applyProfitPreset(){
+  const preset = document.getElementById('profitPreset').value;
+  if(preset==='custom'){ loadProfitPeriodIntoForm(); return; }
+  const range = getPresetRange(preset);
+  if(range){
+    document.getElementById('profitFrom').value = range.from;
+    document.getElementById('profitTo').value = range.to;
+  }
+  loadProfitPeriodIntoForm();
+}
+function loadProfitPeriodIntoForm(){
+  const from = document.getElementById('profitFrom').value;
+  const to = document.getElementById('profitTo').value;
+  if(!from || !to) return;
+  const id = profitPeriodId(from, to);
+  const existing = PROFIT_PERIODS.find(p=>p.id===id);
+  if(existing){
+    document.getElementById('pf_openingKg').value = existing.openingKg || '';
+    document.getElementById('pf_openingRate').value = existing.openingRate || '';
+    document.getElementById('pf_closingKg').value = existing.closingKg || '';
+    CURRENT_PROFIT_CUSTOMERS = (existing.customers||[]).map(c=>({...c}));
+    document.getElementById('pfDeleteBtn').style.display = 'inline-block';
+    document.getElementById('pfStatus').textContent = 'Editing saved period '+from+' → '+to+'.';
+    document.getElementById('pfStatus').className = 'status-msg';
+  } else {
+    document.getElementById('pf_openingKg').value = '';
+    document.getElementById('pf_closingKg').value = '';
+    CURRENT_PROFIT_CUSTOMERS = [];
+    document.getElementById('pfDeleteBtn').style.display = 'none';
+    document.getElementById('pfStatus').textContent = 'New period — not yet saved.';
+    document.getElementById('pfStatus').className = 'status-msg';
+    const prior = findLatestPriorProfitPeriod(from);
+    if(prior){
+      const priorCalc = computeProfitPeriod(prior);
+      document.getElementById('pf_openingRate').value = Number(priorCalc.blendedCostPerKg.toFixed(2));
+      document.getElementById('pf_openingKg').value = prior.closingKg || '';
+      document.getElementById('pf_openingSuggestNote').textContent =
+        `Opening stock rate suggested from the previous saved period (${prior.from} → ${prior.to}), whose blended cost/kg was ₹${priorCalc.blendedCostPerKg.toFixed(2)}/kg and closing stock was ${fmtKg(prior.closingKg||0)}. Override either if this period doesn't follow on directly from that one.`;
+    } else {
+      document.getElementById('pf_openingRate').value = '';
+      document.getElementById('pf_openingSuggestNote').textContent = 'No earlier saved period found for this unit — enter opening stock and its rate manually for the first period.';
+    }
+  }
+  renderProfitability();
+}
+function renderProfitability(){
+  const from = document.getElementById('profitFrom').value;
+  const to = document.getElementById('profitTo').value;
+  const emptyProdEl = document.getElementById('profitEmptyProd');
+  if(!from || !to) return;
+  const period = {
+    from, to,
+    openingKg: num('pf_openingKg'), openingRate: num('pf_openingRate'), closingKg: num('pf_closingKg'),
+    customers: CURRENT_PROFIT_CUSTOMERS
+  };
+  const calc = computeProfitPeriod(period);
+
+  if(calc.prod.loggedDays===0){
+    emptyProdEl.style.display = 'block';
+    emptyProdEl.textContent = 'No daily logs found for '+from+' → '+to+' — production kg and cost/kg for this period will read as zero until you log some days in Daily Log.';
+  } else {
+    emptyProdEl.style.display = 'none';
+  }
+
+  document.getElementById('pfProdKg').textContent = fmtKg(calc.prod.outputKg);
+  document.getElementById('pfProdCost').textContent = fmtMoney(calc.prod.avgCostPerKg) + '/kg &middot; ' + calc.prod.loggedDays + ' logged day(s)';
+  document.getElementById('pfBlendedCost').innerHTML = fmtMoney(calc.blendedCostPerKg) + '<small>/kg</small>';
+  document.getElementById('pfDispatchedKg').textContent = fmtKg(calc.dispatchedKg);
+  document.getElementById('pfCogs').textContent = fmtMoney(calc.cogs);
+  document.getElementById('pfRevenue').textContent = fmtMoney(calc.revenue);
+  document.getElementById('pfRevenueSub').textContent = fmtKg(calc.customerKgTotal) + ' across ' + calc.customers.length + ' customer(s)';
+  document.getElementById('pfGrossProfit').textContent = fmtMoney(calc.grossProfit);
+  document.getElementById('pfMargin').textContent = calc.revenue>0 ? calc.grossMarginPct.toFixed(1)+'% margin' : '—';
+  const profitCard = document.getElementById('pfProfitCard');
+  profitCard.classList.toggle('k-good', calc.grossProfit>=0);
+  profitCard.classList.toggle('k-bad', calc.grossProfit<0);
+
+  const custBody = document.getElementById('pf_customerBody');
+  if(CURRENT_PROFIT_CUSTOMERS.length===0){
+    custBody.innerHTML = `<tr><td colspan="5" class="batch-empty">No customers added yet.</td></tr>`;
+  } else {
+    custBody.innerHTML = CURRENT_PROFIT_CUSTOMERS.map(c=>{
+      const revenue = (Number(c.rate)||0)*(Number(c.kg)||0);
+      return `<tr>
+        <td><input type="text" class="spec-input" value="${c.name||''}" placeholder="Customer name" onchange="updateProfitCustomer('${c.id}','name',this.value)"></td>
+        <td><input type="number" min="0" step="any" value="${c.rate||''}" onchange="updateProfitCustomer('${c.id}','rate',this.value)"></td>
+        <td><input type="number" min="0" step="any" value="${c.kg||''}" onchange="updateProfitCustomer('${c.id}','kg',this.value)"></td>
+        <td style="font-family:var(--f-mono);color:var(--muted);">${fmtMoney(revenue)}</td>
+        <td><button class="batch-rm" onclick="removeProfitCustomer('${c.id}')">Remove</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  const diff = calc.customerKgTotal - calc.dispatchedKg;
+  const reconcileEl = document.getElementById('pf_reconcileNote');
+  if(Math.abs(diff) < 0.5){
+    reconcileEl.style.color = 'var(--good)';
+    reconcileEl.textContent = `Customer dispatched kg (${fmtKg(calc.customerKgTotal)}) matches the derived dispatched figure (${fmtKg(calc.dispatchedKg)}) above — opening + production − closing.`;
+  } else {
+    reconcileEl.style.color = 'var(--bad)';
+    reconcileEl.textContent = `Customer dispatched kg (${fmtKg(calc.customerKgTotal)}) is off by ${fmtKg(Math.abs(diff))} from the derived figure (${fmtKg(calc.dispatchedKg)} = opening + production − closing). Check opening/closing stock or a missing/extra customer row.`;
+  }
+}
+async function saveProfitPeriod(){
+  const from = document.getElementById('profitFrom').value;
+  const to = document.getElementById('profitTo').value;
+  const statusEl = document.getElementById('pfStatus');
+  if(!from || !to){ statusEl.textContent = 'Pick a period first.'; statusEl.className='status-msg err'; return; }
+  if(to < from){ statusEl.textContent = '"To" date must be on or after "From" date.'; statusEl.className='status-msg err'; return; }
+  const id = profitPeriodId(from, to);
+  const period = {
+    id, from, to,
+    openingKg: num('pf_openingKg'), openingRate: num('pf_openingRate'), closingKg: num('pf_closingKg'),
+    customers: CURRENT_PROFIT_CUSTOMERS.map(c=>({id:c.id, name:c.name||'', rate:Number(c.rate)||0, kg:Number(c.kg)||0}))
+  };
+  const idx = PROFIT_PERIODS.findIndex(p=>p.id===id);
+  if(idx>=0) PROFIT_PERIODS[idx] = period; else PROFIT_PERIODS.push(period);
+  const ok = await storageSet(unitScopedKey('profit_periods'), PROFIT_PERIODS);
+  document.getElementById('pfDeleteBtn').style.display = 'inline-block';
+  renderProfitHistory();
+  if(ok){ statusEl.textContent = 'Saved period '+from+' → '+to+'.'; statusEl.className='status-msg'; }
+  else { statusEl.textContent = 'Kept in this session, but could not save centrally (' + (LAST_STORAGE_ERROR||'unknown error') + ').'; statusEl.className='status-msg err'; }
+}
+async function deleteProfitPeriod(){
+  const from = document.getElementById('profitFrom').value;
+  const to = document.getElementById('profitTo').value;
+  const id = profitPeriodId(from, to);
+  if(!PROFIT_PERIODS.find(p=>p.id===id)) return;
+  if(!confirm('Delete the saved profitability period '+from+' → '+to+'?')) return;
+  PROFIT_PERIODS = PROFIT_PERIODS.filter(p=>p.id!==id);
+  await storageSet(unitScopedKey('profit_periods'), PROFIT_PERIODS);
+  document.getElementById('pfDeleteBtn').style.display = 'none';
+  loadProfitPeriodIntoForm();
+  renderProfitHistory();
+}
+function renderProfitHistory(){
+  const body = document.getElementById('profitHistoryBody');
+  if(!body) return;
+  const periods = [...PROFIT_PERIODS].sort((a,b)=> a.from<b.from?1:-1);
+  if(periods.length===0){
+    document.getElementById('profitHistoryEmpty').style.display = 'block';
+    body.innerHTML = '';
+    return;
+  }
+  document.getElementById('profitHistoryEmpty').style.display = 'none';
+  body.innerHTML = periods.map(p=>{
+    const calc = computeProfitPeriod(p);
+    return `<tr>
+      <td>${p.from} → ${p.to}</td>
+      <td>${fmtKg(calc.prod.outputKg)}</td>
+      <td>${fmtKg(calc.dispatchedKg)}</td>
+      <td>${fmtMoney(calc.cogs)}</td>
+      <td>${fmtMoney(calc.revenue)}</td>
+      <td style="color:${calc.grossProfit>=0?'var(--good)':'var(--bad)'};">${fmtMoney(calc.grossProfit)}</td>
+      <td>${calc.revenue>0 ? calc.grossMarginPct.toFixed(1)+'%' : '—'}</td>
+      <td><button class="link-btn" onclick="openProfitPeriod('${p.from}','${p.to}')">Open</button></td>
+    </tr>`;
+  }).join('');
+}
+function openProfitPeriod(from, to){
+  document.getElementById('profitPreset').value = 'custom';
+  document.getElementById('profitFrom').value = from;
+  document.getElementById('profitTo').value = to;
+  loadProfitPeriodIntoForm();
+}
+function renderProfitabilityTab(){
+  if(!document.getElementById('profitFrom').value){
+    const range = getPresetRange('this_month');
+    document.getElementById('profitFrom').value = range.from;
+    document.getElementById('profitTo').value = range.to;
+    document.getElementById('profitPreset').value = 'this_month';
+  }
+  loadProfitPeriodIntoForm();
+  renderProfitHistory();
+}
+
 /* ---------------- settings ---------------- */
 function fillSettingsForm(){
   document.getElementById('set_gbpRate').value = SETTINGS.gbpRate;
@@ -3343,8 +3689,10 @@ async function loadAndRenderCurrentUnit(){
     await loadMasterSkus();
     await loadRawMaterialMaster();
     await loadAllEntries();
+    await loadProfitPeriods();
   } else {
     currentUnit().hasUnderlay = true;
+    PROFIT_PERIODS = [];
   }
   document.getElementById('dashLoading').textContent = '';
 
@@ -3367,6 +3715,10 @@ async function loadAndRenderCurrentUnit(){
   document.getElementById('reportFrom').value = defaultRange.from;
   document.getElementById('reportTo').value = defaultRange.to;
   document.getElementById('reportPreset').value = 'last7';
+
+  document.getElementById('profitFrom').value = '';
+  document.getElementById('profitTo').value = '';
+  document.getElementById('profitPreset').value = 'this_month';
 }
 async function switchUnit(newUnitId){
   if(!UNITS.find(u=>u.id===newUnitId) || newUnitId===CURRENT_UNIT_ID) return;
@@ -3382,6 +3734,7 @@ async function switchUnit(newUnitId){
   MASTER_SKUS = SEED_MASTER_SKUS.map(s=>({...s}));
   RAW_MATERIAL_MASTER = SEED_RAW_MATERIALS.map(m=>({...m}));
   ENTRIES = {};
+  PROFIT_PERIODS = [];
 
   await loadAndRenderCurrentUnit();
   document.getElementById('unitLoadingNote').textContent = '';
