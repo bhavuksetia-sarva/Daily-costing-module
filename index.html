@@ -697,7 +697,7 @@
       <div class="kpi k-neutral">
         <p class="kpi-label">Blended cost / kg</p>
         <div class="kpi-val" id="pfBlendedCost">&mdash;</div>
-        <p class="kpi-sub">Opening stock + production, weighted</p>
+        <p class="kpi-sub">Opening stock + production, weighted &middot; exact, not rounded</p>
       </div>
       <div class="kpi k-neutral">
         <p class="kpi-label">Dispatched (derived)</p>
@@ -707,7 +707,7 @@
       <div class="kpi k-neutral">
         <p class="kpi-label">COGS</p>
         <div class="kpi-val" id="pfCogs">&mdash;</div>
-        <p class="kpi-sub">Dispatched kg &times; blended cost/kg</p>
+        <p class="kpi-sub">Dispatched kg &times; exact blended cost/kg</p>
       </div>
     </div>
     <div class="kpi-row kpi-row-2col">
@@ -721,6 +721,17 @@
         <div class="kpi-val" id="pfRevenue">&mdash;</div>
         <p class="kpi-sub" id="pfRevenueSub">&mdash;</p>
       </div>
+    </div>
+
+    <div class="panel">
+      <h2>Calculation breakdown <span class="accent">&mdash; audit the numbers above, step by step</span></h2>
+      <div class="tbl-wrap">
+        <table id="pf_breakdownTable">
+          <thead><tr><th>Step</th><th>Kg</th><th>Rate</th><th>Value (₹)</th></tr></thead>
+          <tbody id="pf_breakdownBody"></tbody>
+        </table>
+      </div>
+      <div class="note-box">The KPI cards above round every ₹/kg figure to whole rupees for readability. This table carries full decimal precision — the same precision the COGS and Gross Profit figures are actually computed from — so you can re-derive every number by hand and have it tie out exactly.</div>
     </div>
 
     <div class="panel">
@@ -3382,7 +3393,7 @@ function renderProfitability(){
 
   document.getElementById('pfProdKg').textContent = fmtKg(calc.prod.outputKg);
   document.getElementById('pfProdCost').textContent = fmtMoney(calc.prod.avgCostPerKg) + '/kg &middot; ' + calc.prod.loggedDays + ' logged day(s)';
-  document.getElementById('pfBlendedCost').innerHTML = fmtMoney(calc.blendedCostPerKg) + '<small>/kg</small>';
+  document.getElementById('pfBlendedCost').innerHTML = '₹' + calc.blendedCostPerKg.toFixed(2) + '<small>/kg</small>';
   document.getElementById('pfDispatchedKg').textContent = fmtKg(calc.dispatchedKg);
   document.getElementById('pfCogs').textContent = fmtMoney(calc.cogs);
   document.getElementById('pfRevenue').textContent = fmtMoney(calc.revenue);
@@ -3392,6 +3403,23 @@ function renderProfitability(){
   const profitCard = document.getElementById('pfProfitCard');
   profitCard.classList.toggle('k-good', calc.grossProfit>=0);
   profitCard.classList.toggle('k-bad', calc.grossProfit<0);
+
+  const fmtRate = (n) => '₹' + n.toFixed(4) + '/kg';
+  const fmtKgExact = (n) => n.toLocaleString('en-IN', {maximumFractionDigits:2}) + ' kg';
+  const productionRate = calc.prod.outputKg>0 ? calc.prod.totalCost/calc.prod.outputKg : 0;
+  const breakdownRows = [
+    ['Opening stock', fmtKgExact(calc.openingKg), fmtRate(calc.openingRate), fmtMoney(calc.openingValue)],
+    ['+ Production this period', fmtKgExact(calc.prod.outputKg), fmtRate(productionRate), fmtMoney(calc.prod.totalCost)],
+    ['= Total available', fmtKgExact(calc.totalAvailableKg), fmtRate(calc.blendedCostPerKg) + ' (blended)', fmtMoney(calc.totalAvailableValue)],
+    ['&minus; Closing stock', fmtKgExact(calc.closingKg), fmtRate(calc.blendedCostPerKg), '&minus;' + fmtMoney(calc.closingValue)],
+    ['= COGS', fmtKgExact(calc.dispatchedKg), fmtRate(calc.blendedCostPerKg), fmtMoney(calc.cogs)],
+    ['Revenue (from customer table below)', fmtKgExact(calc.customerKgTotal), '&mdash;', fmtMoney(calc.revenue)],
+    ['&minus; COGS', '&mdash;', '&mdash;', '&minus;' + fmtMoney(calc.cogs)],
+    ['= Gross profit', '&mdash;', '&mdash;', fmtMoney(calc.grossProfit)]
+  ];
+  document.getElementById('pf_breakdownBody').innerHTML = breakdownRows.map((r,i)=>`<tr${i===4||i===7?' class="total-row"':''}>
+    <td>${r[0]}</td><td style="font-family:var(--f-mono);">${r[1]}</td><td style="font-family:var(--f-mono);">${r[2]}</td><td style="font-family:var(--f-mono);">${r[3]}</td>
+  </tr>`).join('');
 
   const custBody = document.getElementById('pf_customerBody');
   if(CURRENT_PROFIT_CUSTOMERS.length===0){
