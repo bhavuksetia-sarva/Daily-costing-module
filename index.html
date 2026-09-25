@@ -570,19 +570,6 @@
         </div>
       </div>
 
-      <div class="kpi-row kpi-row-2col">
-        <div class="kpi k-amber">
-          <p class="kpi-label">Sheets &middot; Block Conversion Cost/kg</p>
-          <div class="kpi-val" id="repBlockConversion">&mdash;</div>
-          <p class="kpi-sub">Foaming + overhead only, split by block weight, before cutting &mdash; excl. raw material</p>
-        </div>
-        <div class="kpi k-amber">
-          <p class="kpi-label">Sheets &middot; Block Raw Material Cost/kg</p>
-          <div class="kpi-val" id="repBlockRaw">&mdash;</div>
-          <p class="kpi-sub" id="repBlockRawSub">&mdash;</p>
-        </div>
-      </div>
-
       <div class="panel" id="reportRollSkuPanel">
         <h2>Roll SKU cost &mdash; <span class="accent">weighted average for this period</span></h2>
         <div class="tbl-wrap">
@@ -677,7 +664,7 @@
         <label for="profitTo">To</label>
         <input type="date" id="profitTo" onchange="document.getElementById('profitPreset').value='custom'; loadProfitPeriodIntoForm();">
       </div>
-      <div class="note-box">Sheets vertical only. Opening/closing stock and production are still tracked as one combined blocks+sheets pool, exactly as before — but COGS now prices the Blocks portion of what you dispatch at its own period-weighted cost/kg (raw material + foaming/overhead, before cutting) instead of the blended rate, since blocks can sell at a different price than sheets. Production kg and cost/kg are pulled automatically from the Daily Log.</div>
+      <div class="note-box">Sheets vertical only. Blocks and sheets are treated as one pool of finished-goods kg at the same cost/kg. Production kg and cost/kg for this range are pulled automatically from the Daily Log (same weighted-average logic as the Reports tab) — everything else on this tab is stock and sales you enter.</div>
     </div>
 
     <div id="profitEmptyProd" class="note-box" style="display:none;border-color:var(--bad);"></div>
@@ -701,25 +688,6 @@
       <div class="note-box" id="pf_openingSuggestNote"></div>
     </div>
 
-    <div class="panel">
-      <h2>Blocks vs. sheets split <span class="accent">&mdash; for COGS only</span></h2>
-      <div class="field-grid">
-        <div class="field">
-          <label>Blocks dispatched <span class="unit">(kg, sold as-is, before cutting)</span></label>
-          <input type="number" id="pf_blocksDispatchedKg" min="0" step="any" oninput="renderProfitability()">
-        </div>
-        <div class="field">
-          <label>Sheets dispatched <span class="unit">(kg, derived &mdash; total dispatched minus blocks)</span></label>
-          <div id="pf_sheetsDispatchedDisplay" style="padding:8px 10px;background:var(--panel3);border:1px solid var(--border-lt);border-radius:6px;font-family:var(--f-mono);font-size:13px;">&mdash;</div>
-        </div>
-        <div class="field">
-          <label>Block cost/kg used <span class="unit">(period-weighted, raw + conversion)</span></label>
-          <div id="pf_blockCostUsedDisplay" style="padding:8px 10px;background:var(--panel3);border:1px solid var(--border-lt);border-radius:6px;font-family:var(--f-mono);font-size:13px;">&mdash;</div>
-        </div>
-      </div>
-      <div class="note-box" id="pf_blockSplitNote"></div>
-    </div>
-
     <div class="kpi-row">
       <div class="kpi k-amber">
         <p class="kpi-label">Production this period</p>
@@ -739,7 +707,7 @@
       <div class="kpi k-neutral">
         <p class="kpi-label">COGS</p>
         <div class="kpi-val" id="pfCogs">&mdash;</div>
-        <p class="kpi-sub">Blocks + Sheets, priced separately &mdash; see split below</p>
+        <p class="kpi-sub">Dispatched kg &times; exact blended cost/kg</p>
       </div>
     </div>
     <div class="kpi-row kpi-row-2col">
@@ -770,7 +738,7 @@
       <h2>Sales by customer <span class="accent">&mdash; fixed ₹/kg rate for the period</span></h2>
       <div class="batch-tbl-wrap">
         <table class="batch-tbl">
-          <thead><tr><th>Customer</th><th>Product</th><th>Rate ₹/kg</th><th>Dispatched kg</th><th>Revenue</th><th></th></tr></thead>
+          <thead><tr><th>Customer</th><th>Rate ₹/kg</th><th>Dispatched kg</th><th>Revenue</th><th></th></tr></thead>
           <tbody id="pf_customerBody"></tbody>
         </table>
       </div>
@@ -1632,21 +1600,6 @@ function computeDay(e, settings, materialRates, reclaimRate){
   sheets.efficiencyPct = sheetRawInputKg>0 ? (1 - (e.sh_wastageKg||0)/sheetRawInputKg)*100 : 0;
   sheets.rawInputKg = sheetRawInputKg;
   Object.assign(sheets, binderSplit(sheetRawMaterials));
-
-  // ---- Block-level metrics (Sheets line) — informational (Reports) + Profitability feed only.
-  // Deliberately separate from everything above: same shared foaming/overhead pool and the same
-  // sheets-line raw material total, but STOPPED BEFORE cutting is added in, and divided by BLOCK
-  // weight (kg of blocks made that day) instead of Sheet output kg. This answers "what did today's
-  // blocks cost, before any cutting happened" — nothing above this comment is affected by it.
-  const blockKg = e.s_sheetBlocksKg || 0;
-  const blockConversionCost = (sharedLabor*sheetRatio) + (sharedElec*sheetRatio) + (sharedOther*sheetRatio) + (dailyOverhead*sheetRatio);
-  const blockRawCost = sheetRawNet; // same raw material total the Sheets line already uses
-  sheets.blockKg = blockKg;
-  sheets.blockConversionCost = blockConversionCost;
-  sheets.blockRawCost = blockRawCost;
-  sheets.blockConversionPerKg = blockKg>0 ? blockConversionCost/blockKg : 0;
-  sheets.blockRawPerKg = blockKg>0 ? blockRawCost/blockKg : 0;
-  sheets.blockCostPerKg = blockKg>0 ? (blockConversionCost+blockRawCost)/blockKg : 0;
 
   const underlayRawMaterials = (e.u_rawMaterials||[]).map(m=>{
     const resolved = materialRates[m.materialId];
@@ -3290,11 +3243,6 @@ function renderReports(){
   document.getElementById('repSheetEfficiency').innerHTML = sEff.toFixed(2) + '<small>%</small>';
   document.getElementById('repUnderlayEfficiency').innerHTML = uEff.toFixed(2) + '<small>%</small>';
 
-  const repBlockAgg = aggregateBlocksCostForRange(from, to);
-  document.getElementById('repBlockConversion').innerHTML = fmtMoney(repBlockAgg.conversionPerKg) + '<small>/kg</small>';
-  document.getElementById('repBlockRaw').innerHTML = fmtMoney(repBlockAgg.rawPerKg) + '<small>/kg</small>';
-  document.getElementById('repBlockRawSub').textContent = 'Same raw material ledger as Sheets line · ' + fmtKg(repBlockAgg.blockKg) + ' of blocks made this period';
-
   // reuse the same composition-table renderer as the dashboard by feeding it a compatible shape
   const compC = { sheets: {...agg.sheets, outputKg:sOut}, underlay: {...agg.underlay, outputKg:uOut} };
   renderCompositionTableInto('reportCompositionBody', compC);
@@ -3332,7 +3280,7 @@ async function deleteFromHistory(d){
   renderDashboard();
 }
 
-/* ---------------- profitability (Sheets vertical: blocks priced separately from sheets) ---------------- */
+/* ---------------- profitability (Sheets vertical: blocks + sheets, one pool) ---------------- */
 function aggregateSheetsCostForRange(from, to){
   const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
   const dates = Object.keys(ENTRIES).filter(d=>d>=from && d<=to).sort();
@@ -3344,36 +3292,11 @@ function aggregateSheetsCostForRange(from, to){
   });
   return { outputKg, totalCost, avgCostPerKg: outputKg>0 ? totalCost/outputKg : 0, loggedDays: dates.length };
 }
-// Block cost/kg, period-weighted: conversion (foaming+overhead, split by block weight, before cutting)
-// plus the same raw material total the Sheets line already uses — this is what prices a block sold
-// as-is (WIP), independent of whatever the blended Sheets rate happens to be that period.
-function aggregateBlocksCostForRange(from, to){
-  const ledger = computeInventoryLedger(ENTRIES, RAW_MATERIAL_MASTER);
-  const dates = Object.keys(ENTRIES).filter(d=>d>=from && d<=to).sort();
-  let blockKg = 0, conversionCost = 0, rawCost = 0;
-  dates.forEach(d=>{
-    const c = computeDay(ENTRIES[d], SETTINGS, (ledger.ledgerByDate[d]||{}).perMaterial||{}, (ledger.ledgerByDate[d]||{}).reclaimRate);
-    blockKg += c.sheets.blockKg||0;
-    conversionCost += c.sheets.blockConversionCost||0;
-    rawCost += c.sheets.blockRawCost||0;
-  });
-  const totalCost = conversionCost + rawCost;
-  return {
-    blockKg, conversionCost, rawCost, totalCost,
-    conversionPerKg: blockKg>0 ? conversionCost/blockKg : 0,
-    rawPerKg: blockKg>0 ? rawCost/blockKg : 0,
-    costPerKg: blockKg>0 ? totalCost/blockKg : 0,
-    loggedDays: dates.length
-  };
-}
 function findLatestPriorProfitPeriod(beforeDate){
   const prior = PROFIT_PERIODS.filter(p=>p.to < beforeDate).sort((a,b)=> a.to<b.to?1:-1);
   return prior.length ? prior[0] : null;
 }
 function computeProfitPeriod(period){
-  // ---- Everything in this block is UNCHANGED from before the blocks/sheets split: opening stock,
-  // production (sheet output kg, same as always), blended cost/kg, and the derived total dispatched
-  // figure all mean exactly what they meant previously.
   const prod = aggregateSheetsCostForRange(period.from, period.to);
   const openingKg = Number(period.openingKg)||0;
   const openingRate = Number(period.openingRate)||0;
@@ -3384,36 +3307,23 @@ function computeProfitPeriod(period){
   const blendedCostPerKg = totalAvailableKg>0 ? totalAvailableValue/totalAvailableKg : 0;
   const closingValue = closingKg * blendedCostPerKg;
   const dispatchedKg = totalAvailableKg - closingKg;
-
-  // ---- New: split that same total dispatched kg into Blocks (priced at their own period-weighted
-  // rate) and Sheets (priced at the blended rate above, exactly as before). Blocks dispatched is the
-  // one new number you type in; Sheets dispatched is whatever's left.
-  const blockAgg = aggregateBlocksCostForRange(period.from, period.to);
-  const blocksDispatchedKg = Number(period.blocksDispatchedKg)||0;
-  const sheetsDispatchedKg = dispatchedKg - blocksDispatchedKg;
-  const blocksCogs = blocksDispatchedKg * blockAgg.costPerKg;
-  const sheetsCogs = sheetsDispatchedKg * blendedCostPerKg;
-  const cogs = blocksCogs + sheetsCogs;
-
-  const customers = (period.customers||[]).map(c=>({...c, product: c.product==='block'?'block':'sheet', revenue: (Number(c.rate)||0)*(Number(c.kg)||0)}));
+  const cogs = totalAvailableValue - closingValue;
+  const customers = (period.customers||[]).map(c=>({...c, revenue: (Number(c.rate)||0)*(Number(c.kg)||0)}));
   const revenue = customers.reduce((s,c)=>s+c.revenue,0);
   const customerKgTotal = customers.reduce((s,c)=>s+(Number(c.kg)||0),0);
-  const blockCustomerKg = customers.filter(c=>c.product==='block').reduce((s,c)=>s+(Number(c.kg)||0),0);
-  const sheetCustomerKg = customers.filter(c=>c.product==='sheet').reduce((s,c)=>s+(Number(c.kg)||0),0);
   const grossProfit = revenue - cogs;
   const grossMarginPct = revenue>0 ? (grossProfit/revenue)*100 : 0;
   return { prod, openingKg, openingRate, openingValue, closingKg, closingValue, totalAvailableKg, totalAvailableValue,
-    blendedCostPerKg, dispatchedKg, blockAgg, blocksDispatchedKg, sheetsDispatchedKg, blocksCogs, sheetsCogs, cogs,
-    customers, revenue, customerKgTotal, blockCustomerKg, sheetCustomerKg, grossProfit, grossMarginPct };
+    blendedCostPerKg, dispatchedKg, cogs, customers, revenue, customerKgTotal, grossProfit, grossMarginPct };
 }
 
 let CURRENT_PROFIT_CUSTOMERS = [];
-function addProfitCustomer(){ CURRENT_PROFIT_CUSTOMERS.push({id:newBatchId(), name:'', product:'sheet', rate:0, kg:0}); renderProfitability(); }
+function addProfitCustomer(){ CURRENT_PROFIT_CUSTOMERS.push({id:newBatchId(), name:'', rate:0, kg:0}); renderProfitability(); }
 function removeProfitCustomer(id){ CURRENT_PROFIT_CUSTOMERS = CURRENT_PROFIT_CUSTOMERS.filter(c=>c.id!==id); renderProfitability(); }
 function updateProfitCustomer(id, field, value){
   const c = CURRENT_PROFIT_CUSTOMERS.find(x=>x.id===id);
   if(!c) return;
-  c[field] = (field==='name'||field==='product') ? value : (parseFloat(value)||0);
+  c[field] = field==='name' ? value : (parseFloat(value)||0);
   renderProfitability();
 }
 
@@ -3437,15 +3347,13 @@ function loadProfitPeriodIntoForm(){
     document.getElementById('pf_openingKg').value = existing.openingKg || '';
     document.getElementById('pf_openingRate').value = existing.openingRate || '';
     document.getElementById('pf_closingKg').value = existing.closingKg || '';
-    document.getElementById('pf_blocksDispatchedKg').value = existing.blocksDispatchedKg || '';
-    CURRENT_PROFIT_CUSTOMERS = (existing.customers||[]).map(c=>({...c, product: c.product==='block'?'block':'sheet'}));
+    CURRENT_PROFIT_CUSTOMERS = (existing.customers||[]).map(c=>({...c}));
     document.getElementById('pfDeleteBtn').style.display = 'inline-block';
     document.getElementById('pfStatus').textContent = 'Editing saved period '+from+' → '+to+'.';
     document.getElementById('pfStatus').className = 'status-msg';
   } else {
     document.getElementById('pf_openingKg').value = '';
     document.getElementById('pf_closingKg').value = '';
-    document.getElementById('pf_blocksDispatchedKg').value = '';
     CURRENT_PROFIT_CUSTOMERS = [];
     document.getElementById('pfDeleteBtn').style.display = 'none';
     document.getElementById('pfStatus').textContent = 'New period — not yet saved.';
@@ -3472,7 +3380,6 @@ function renderProfitability(){
   const period = {
     from, to,
     openingKg: num('pf_openingKg'), openingRate: num('pf_openingRate'), closingKg: num('pf_closingKg'),
-    blocksDispatchedKg: num('pf_blocksDispatchedKg'),
     customers: CURRENT_PROFIT_CUSTOMERS
   };
   const calc = computeProfitPeriod(period);
@@ -3497,55 +3404,31 @@ function renderProfitability(){
   profitCard.classList.toggle('k-good', calc.grossProfit>=0);
   profitCard.classList.toggle('k-bad', calc.grossProfit<0);
 
-  // ---- Blocks vs. sheets split panel
-  document.getElementById('pf_sheetsDispatchedDisplay').textContent = fmtKg(calc.sheetsDispatchedKg);
-  document.getElementById('pf_sheetsDispatchedDisplay').style.color = calc.sheetsDispatchedKg<0 ? 'var(--bad)' : 'var(--text)';
-  document.getElementById('pf_blockCostUsedDisplay').textContent = '₹' + calc.blockAgg.costPerKg.toFixed(2) + '/kg';
-  const splitNote = document.getElementById('pf_blockSplitNote');
-  if(calc.sheetsDispatchedKg < 0){
-    splitNote.style.color = 'var(--bad)';
-    splitNote.textContent = `Blocks dispatched (${fmtKg(calc.blocksDispatchedKg)}) is more than total dispatched kg (${fmtKg(calc.dispatchedKg)}) for this period — Sheets dispatched has gone negative. Check the blocks figure, or opening/closing stock.`;
-  } else if(calc.blockAgg.loggedDays>0 && calc.blockAgg.blockKg===0 && calc.blocksDispatchedKg>0){
-    splitNote.style.color = 'var(--bad)';
-    splitNote.textContent = `You've entered blocks dispatched, but no block-making days were logged for ${from} → ${to} (Sheets line "Blocks made" field), so the block cost/kg rate is ₹0 and Blocks COGS will understate. Check the Daily Log for this period.`;
-  } else {
-    splitNote.style.color = 'var(--muted)';
-    splitNote.textContent = `Block cost/kg = raw material (same ledger as the Sheets line) + foaming/overhead split by block weight, before any cutting — period-weighted over ${fmtKg(calc.blockAgg.blockKg)} of blocks made. Sheets dispatched keeps using the blended cost/kg above, exactly as before this split was added.`;
-  }
-
   const fmtRate = (n) => '₹' + n.toFixed(4) + '/kg';
   const fmtKgExact = (n) => n.toLocaleString('en-IN', {maximumFractionDigits:2}) + ' kg';
   const productionRate = calc.prod.outputKg>0 ? calc.prod.totalCost/calc.prod.outputKg : 0;
   const breakdownRows = [
     ['Opening stock', fmtKgExact(calc.openingKg), fmtRate(calc.openingRate), fmtMoney(calc.openingValue)],
-    ['+ Production this period (sheets cut)', fmtKgExact(calc.prod.outputKg), fmtRate(productionRate), fmtMoney(calc.prod.totalCost)],
+    ['+ Production this period', fmtKgExact(calc.prod.outputKg), fmtRate(productionRate), fmtMoney(calc.prod.totalCost)],
     ['= Total available', fmtKgExact(calc.totalAvailableKg), fmtRate(calc.blendedCostPerKg) + ' (blended)', fmtMoney(calc.totalAvailableValue)],
     ['&minus; Closing stock', fmtKgExact(calc.closingKg), fmtRate(calc.blendedCostPerKg), '&minus;' + fmtMoney(calc.closingValue)],
-    ['= Total dispatched (blocks + sheets)', fmtKgExact(calc.dispatchedKg), '&mdash;', '&mdash;'],
-    ['&nbsp;&nbsp;&middot; Blocks dispatched, at block cost/kg', fmtKgExact(calc.blocksDispatchedKg), fmtRate(calc.blockAgg.costPerKg), fmtMoney(calc.blocksCogs)],
-    ['&nbsp;&nbsp;&middot; Sheets dispatched, at blended cost/kg', fmtKgExact(calc.sheetsDispatchedKg), fmtRate(calc.blendedCostPerKg), fmtMoney(calc.sheetsCogs)],
-    ['= COGS (Blocks + Sheets)', fmtKgExact(calc.dispatchedKg), '&mdash;', fmtMoney(calc.cogs)],
+    ['= COGS', fmtKgExact(calc.dispatchedKg), fmtRate(calc.blendedCostPerKg), fmtMoney(calc.cogs)],
     ['Revenue (from customer table below)', fmtKgExact(calc.customerKgTotal), '&mdash;', fmtMoney(calc.revenue)],
     ['&minus; COGS', '&mdash;', '&mdash;', '&minus;' + fmtMoney(calc.cogs)],
     ['= Gross profit', '&mdash;', '&mdash;', fmtMoney(calc.grossProfit)]
   ];
-  document.getElementById('pf_breakdownBody').innerHTML = breakdownRows.map((r,i)=>`<tr${i===7||i===10?' class="total-row"':''}>
+  document.getElementById('pf_breakdownBody').innerHTML = breakdownRows.map((r,i)=>`<tr${i===4||i===7?' class="total-row"':''}>
     <td>${r[0]}</td><td style="font-family:var(--f-mono);">${r[1]}</td><td style="font-family:var(--f-mono);">${r[2]}</td><td style="font-family:var(--f-mono);">${r[3]}</td>
   </tr>`).join('');
 
   const custBody = document.getElementById('pf_customerBody');
   if(CURRENT_PROFIT_CUSTOMERS.length===0){
-    custBody.innerHTML = `<tr><td colspan="6" class="batch-empty">No customers added yet.</td></tr>`;
+    custBody.innerHTML = `<tr><td colspan="5" class="batch-empty">No customers added yet.</td></tr>`;
   } else {
     custBody.innerHTML = CURRENT_PROFIT_CUSTOMERS.map(c=>{
       const revenue = (Number(c.rate)||0)*(Number(c.kg)||0);
-      const isBlock = c.product==='block';
       return `<tr>
         <td><input type="text" class="spec-input" value="${c.name||''}" placeholder="Customer name" onchange="updateProfitCustomer('${c.id}','name',this.value)"></td>
-        <td><select onchange="updateProfitCustomer('${c.id}','product',this.value)">
-          <option value="sheet" ${!isBlock?'selected':''}>Sheet</option>
-          <option value="block" ${isBlock?'selected':''}>Block</option>
-        </select></td>
         <td><input type="number" min="0" step="any" value="${c.rate||''}" onchange="updateProfitCustomer('${c.id}','rate',this.value)"></td>
         <td><input type="number" min="0" step="any" value="${c.kg||''}" onchange="updateProfitCustomer('${c.id}','kg',this.value)"></td>
         <td style="font-family:var(--f-mono);color:var(--muted);">${fmtMoney(revenue)}</td>
@@ -3554,14 +3437,15 @@ function renderProfitability(){
     }).join('');
   }
 
+  const diff = calc.customerKgTotal - calc.dispatchedKg;
   const reconcileEl = document.getElementById('pf_reconcileNote');
-  const blockDiff = calc.blockCustomerKg - calc.blocksDispatchedKg;
-  const sheetDiff = calc.sheetCustomerKg - calc.sheetsDispatchedKg;
-  const blockOk = Math.abs(blockDiff) < 0.5, sheetOk = Math.abs(sheetDiff) < 0.5;
-  const lines = [];
-  lines.push(`<span style="color:${blockOk?'var(--good)':'var(--bad)'};">Block rows: ${fmtKg(calc.blockCustomerKg)} vs. Blocks dispatched (${fmtKg(calc.blocksDispatchedKg)})${blockOk?' — matches.':' — off by '+fmtKg(Math.abs(blockDiff))+'.'}</span>`);
-  lines.push(`<span style="color:${sheetOk?'var(--good)':'var(--bad)'};">Sheet rows: ${fmtKg(calc.sheetCustomerKg)} vs. Sheets dispatched, derived (${fmtKg(calc.sheetsDispatchedKg)})${sheetOk?' — matches.':' — off by '+fmtKg(Math.abs(sheetDiff))+'.'}</span>`);
-  reconcileEl.innerHTML = lines.join('<br>');
+  if(Math.abs(diff) < 0.5){
+    reconcileEl.style.color = 'var(--good)';
+    reconcileEl.textContent = `Customer dispatched kg (${fmtKg(calc.customerKgTotal)}) matches the derived dispatched figure (${fmtKg(calc.dispatchedKg)}) above — opening + production − closing.`;
+  } else {
+    reconcileEl.style.color = 'var(--bad)';
+    reconcileEl.textContent = `Customer dispatched kg (${fmtKg(calc.customerKgTotal)}) is off by ${fmtKg(Math.abs(diff))} from the derived figure (${fmtKg(calc.dispatchedKg)} = opening + production − closing). Check opening/closing stock or a missing/extra customer row.`;
+  }
 }
 async function saveProfitPeriod(){
   const from = document.getElementById('profitFrom').value;
@@ -3573,8 +3457,7 @@ async function saveProfitPeriod(){
   const period = {
     id, from, to,
     openingKg: num('pf_openingKg'), openingRate: num('pf_openingRate'), closingKg: num('pf_closingKg'),
-    blocksDispatchedKg: num('pf_blocksDispatchedKg'),
-    customers: CURRENT_PROFIT_CUSTOMERS.map(c=>({id:c.id, name:c.name||'', product: c.product==='block'?'block':'sheet', rate:Number(c.rate)||0, kg:Number(c.kg)||0}))
+    customers: CURRENT_PROFIT_CUSTOMERS.map(c=>({id:c.id, name:c.name||'', rate:Number(c.rate)||0, kg:Number(c.kg)||0}))
   };
   const idx = PROFIT_PERIODS.findIndex(p=>p.id===id);
   if(idx>=0) PROFIT_PERIODS[idx] = period; else PROFIT_PERIODS.push(period);
